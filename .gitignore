@@ -8,3 +8,6 @@ __pycache__/
 frontend/node_modules/
 frontend/.svelte-kit/
 frontend/build/
+
+# Mypy
+.mypy_cache/
