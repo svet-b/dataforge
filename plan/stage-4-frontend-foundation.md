@@ -271,23 +271,57 @@ Text: slate-800 (primary), slate-500 (secondary)
 
 ### 10. Proxy Configuration
 
-Configure Vite to proxy API calls to the backend:
+Configure Vite to proxy API calls to the backend. The proxy target should be configurable via the `VITE_API_URL` environment variable so it works both locally and inside Docker:
 
 ```typescript
 // vite.config.ts
+const apiTarget = process.env.VITE_API_URL || 'http://localhost:8000';
+
 export default defineConfig({
   server: {
     proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
+      '/api': apiTarget,
     },
   },
 });
 ```
 
 Update the API client to use relative URLs (`/api/...` instead of `http://localhost:8000/api/...`) so the proxy works.
+
+### 11. Docker Setup
+
+Add a `frontend/Dockerfile` for the development container:
+
+```dockerfile
+FROM node:20-slim
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+```
+
+Add the frontend service to the project's `docker-compose.yml`:
+
+```yaml
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: "http://backend:8000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0
+```
+
+The `VITE_API_URL` env var tells Vite's dev proxy to forward `/api` requests to the `backend` Docker service. The `/app/node_modules` anonymous volume prevents the host's `node_modules` from overriding the container's installed dependencies.
 
 ## Acceptance Criteria
 
