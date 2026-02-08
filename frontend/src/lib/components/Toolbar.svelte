@@ -1,0 +1,76 @@
+<script lang="ts">
+	import { updatePipelineName, runPipeline } from '$lib/stores/pipeline.js';
+
+	let {
+		pipelineId,
+		pipelineName
+	}: {
+		pipelineId: string;
+		pipelineName: string;
+	} = $props();
+
+	let editing = $state(false);
+	let editValue = $state('');
+	let running = $state(false);
+
+	function startEdit() {
+		editValue = pipelineName;
+		editing = true;
+	}
+
+	function saveName() {
+		editing = false;
+		if (editValue.trim() && editValue !== pipelineName) {
+			updatePipelineName(pipelineId, editValue.trim());
+		}
+	}
+
+	function onkeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') saveName();
+		if (e.key === 'Escape') editing = false;
+	}
+
+	async function handleRun() {
+		running = true;
+		try {
+			await runPipeline(pipelineId);
+		} finally {
+			running = false;
+		}
+	}
+</script>
+
+<div class="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2">
+	<a href="/" class="text-gray-500 hover:text-gray-700" aria-label="Back to pipelines">
+		<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round" />
+		</svg>
+	</a>
+
+	<div class="flex-1">
+		{#if editing}
+			<input
+				class="rounded border border-gray-300 px-2 py-1 text-sm font-semibold focus:border-blue-500 focus:outline-none"
+				bind:value={editValue}
+				{onkeydown}
+				onblur={saveName}
+				autofocus
+			/>
+		{:else}
+			<button
+				class="text-sm font-semibold text-gray-800 hover:text-blue-600"
+				onclick={startEdit}
+			>
+				{pipelineName}
+			</button>
+		{/if}
+	</div>
+
+	<button
+		class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700 disabled:opacity-50"
+		onclick={handleRun}
+		disabled={running}
+	>
+		{running ? 'Running...' : 'Run'}
+	</button>
+</div>
