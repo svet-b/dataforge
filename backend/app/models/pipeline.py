@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
+from sqlalchemy import JSON, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.edge import Edge
+    from app.models.node import Node
+    from app.models.run import RunHistory
+    from app.models.uploaded_file import UploadedFile
+
+
+class Pipeline(Base):
+    __tablename__ = "pipelines"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parameters: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[str] = mapped_column(
+        String, nullable=False, default=lambda: datetime.now(UTC).isoformat()
+    )
+    updated_at: Mapped[str] = mapped_column(
+        String, nullable=False, default=lambda: datetime.now(UTC).isoformat()
+    )
+
+    nodes: Mapped[list[Node]] = relationship(
+        "Node", back_populates="pipeline", cascade="all, delete-orphan"
+    )
+    edges: Mapped[list[Edge]] = relationship(
+        "Edge", back_populates="pipeline", cascade="all, delete-orphan"
+    )
+    uploaded_files: Mapped[list[UploadedFile]] = relationship(
+        "UploadedFile", back_populates="pipeline", cascade="all, delete-orphan"
+    )
+    runs: Mapped[list[RunHistory]] = relationship(
+        "RunHistory", back_populates="pipeline", cascade="all, delete-orphan"
+    )
