@@ -184,7 +184,7 @@ Run all tests to make sure everything passes.
 
 **Spec file:** `stage-4-frontend-foundation.md`
 
-**What it does:** Sets up the SvelteKit project with Svelvet DAG editor, Tailwind, and basic pages — pipeline list and pipeline editor with a working node graph. Connects to the backend API. At the end, you can create a pipeline, add/remove nodes, connect them, and save.
+**What it does:** Sets up the SvelteKit project with Svelte Flow DAG editor, Tailwind, and basic pages — pipeline list and pipeline editor with a working node graph. Connects to the backend API. At the end, you can create a pipeline, add/remove nodes, connect them, and save.
 
 **Prompt for Claude Code:**
 
@@ -193,7 +193,7 @@ Read the spec file @plan/stage-4-frontend-foundation.md and implement it fully.
 
 You are building the frontend for DataForge, connecting to an existing FastAPI backend. The backend is already running — you can test against it.
 
-Create the SvelteKit project in the frontend/ directory. Set up Svelvet for the DAG editor, Tailwind for styling, and implement the pipeline list page and pipeline editor page with a working node graph.
+Create the SvelteKit project in the frontend/ directory. Set up Svelte Flow (@xyflow/svelte) for the DAG editor, Tailwind for styling, and implement the pipeline list page and pipeline editor page with a working node graph.
 
 Focus on the DAG canvas and basic node CRUD. Do NOT implement data preview, SQL editor, or LLM chat — those come in later stages.
 

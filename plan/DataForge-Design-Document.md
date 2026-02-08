@@ -39,7 +39,7 @@ With DataForge, this worker:
 │                                                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
 │  │  DAG Editor  │  │  Data Preview│  │  SQL Editor    │  │
-│  │  (Svelvet)   │  │  Panel       │  │  Panel         │  │
+│  │   (xyflow)   │  │  Panel       │  │  Panel         │  │
 │  └──────────────┘  └──────────────┘  └───────────────┘  │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
 │  │  LLM Chat    │  │  Parameter   │  │  Run History   │  │
@@ -628,7 +628,7 @@ The LLM chat panel also supports iterative refinement: "Add a filter for only ac
 ### 7.1 Tech Stack
 
 - **SvelteKit** — Application framework
-- **Svelvet** — Node graph / DAG editor library
+- **Svelte Flow** — Node graph / DAG editor library
 - **CodeMirror 6** — SQL editor with syntax highlighting (DuckDB dialect)
 - **TanStack Table** (Svelte adapter) — Data preview tables with sorting, filtering, pagination
 - **Tailwind CSS** — Utility-first styling
@@ -640,7 +640,7 @@ The LLM chat panel also supports iterative refinement: "Add a filter for only ac
 │  Toolbar: [Pipeline Name] [Save] [Run] [Parameters] [History]│
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
-│                    DAG Canvas (Svelvet)                       │
+│                  DAG Canvas (Svelte Flow)                    │
 │                                                              │
 │   ┌──────┐       ┌──────────┐       ┌──────────┐            │
 │   │ Meter│──────▶│ Hourly   │──────▶│ Compute  │──────▶[OUT]│
@@ -948,7 +948,7 @@ Deliverables:
 - Pipeline, Node, Edge CRUD endpoints
 - DuckDB execution engine: topological sort, node execution, parameter injection
 - File source connector (CSV only)
-- Minimal SvelteKit app with Svelvet DAG canvas
+- Minimal SvelteKit app with Svelte Flow DAG canvas
 - Can create a pipeline with file source → transform → output, execute it, and see JSON results
 
 ### Phase 2: Interactive Design (Weeks 4–6)
@@ -998,7 +998,7 @@ Deliverables:
 | Layer | Technology | Rationale |
 |---|---|---|
 | Frontend framework | SvelteKit | Lightweight, excellent reactivity, good DX |
-| DAG editor | Svelvet | Svelte-native node graph library |
+| DAG editor | Svelte Flow | Svelte port of xyflow React library |
 | SQL editor | CodeMirror 6 | Best-in-class code editor, DuckDB mode available |
 | Data tables | TanStack Table (Svelte) | Feature-rich, framework-agnostic |
 | Styling | Tailwind CSS | Rapid, consistent styling |

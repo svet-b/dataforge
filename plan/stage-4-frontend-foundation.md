@@ -16,11 +16,9 @@ Stages 1–3 are complete. The backend is fully functional with:
 ## Tech Stack
 
 - **SvelteKit** — Application framework (use latest version, adapter-static for production)
-- **Svelvet** — Svelte-native node graph library for the DAG canvas
+- **Svelte Flow** — Node graph library for the DAG canvas
 - **Tailwind CSS** — Styling
 - **TypeScript** — For type safety
-
-**Important:** Before starting, check Svelvet's current API. Install it and read its docs. If Svelvet has breaking changes or isn't suitable, use `@xyflow/svelte` (Svelte Flow) as an alternative — it's the Svelte port of React Flow and is well-maintained.
 
 ## Deliverables
 
@@ -165,7 +163,7 @@ This is the main workspace. Layout:
 │  Toolbar: [← Back] [Pipeline Name (editable)] [Save] [Run] │
 ├────────┬─────────────────────────────────────────────────┤
 │ Node   │                                                 │
-│ Palette│           DAG Canvas (Svelvet)                  │
+│ Palette│         DAG Canvas (Svelte Flow)                │
 │        │                                                 │
 │ [API]  │                                                 │
 │ [File] │     Nodes are draggable, connectable            │
@@ -181,7 +179,7 @@ This is the main workspace. Layout:
 
 ### 5. DAG Canvas (`DagCanvas.svelte`)
 
-Using Svelvet (or Svelte Flow), implement:
+Using Svelte Flow (@xyflow/svelte), implement:
 
 **Custom node components** for each type:
 - **SourceApiNode:** Blue background, cloud icon, shows node name. Has one output port (right side).
@@ -206,7 +204,7 @@ Each node should display:
 - **Delete:** Right-click edge → "Delete", or select + Delete key. Call `deleteEdge()` API.
 
 **Canvas features:**
-- Pan and zoom (built-in with Svelvet/Svelte Flow)
+- Pan and zoom (built-in with Svelte Flow)
 - Minimap (optional, nice to have)
 - Snap-to-grid (optional)
 
