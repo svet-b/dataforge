@@ -1,17 +1,20 @@
 <script lang="ts">
-	import { updatePipelineName, runPipeline } from '$lib/stores/pipeline.js';
+	import { updatePipelineName } from '$lib/stores/pipeline.js';
 
 	let {
 		pipelineId,
-		pipelineName
+		pipelineName,
+		onOpenParams,
+		onOpenRun
 	}: {
 		pipelineId: string;
 		pipelineName: string;
+		onOpenParams: () => void;
+		onOpenRun: () => void;
 	} = $props();
 
 	let editing = $state(false);
 	let editValue = $state('');
-	let running = $state(false);
 
 	function startEdit() {
 		editValue = pipelineName;
@@ -28,15 +31,6 @@
 	function onkeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter') saveName();
 		if (e.key === 'Escape') editing = false;
-	}
-
-	async function handleRun() {
-		running = true;
-		try {
-			await runPipeline(pipelineId);
-		} finally {
-			running = false;
-		}
 	}
 </script>
 
@@ -67,10 +61,16 @@
 	</div>
 
 	<button
-		class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700 disabled:opacity-50"
-		onclick={handleRun}
-		disabled={running}
+		class="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+		onclick={onOpenParams}
 	>
-		{running ? 'Running...' : 'Run'}
+		Parameters
+	</button>
+
+	<button
+		class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700"
+		onclick={onOpenRun}
+	>
+		Run
 	</button>
 </div>

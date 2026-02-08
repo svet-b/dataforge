@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import type { Node, Edge } from '@xyflow/svelte';
 import { api, ApiError } from '$lib/api/client.js';
-import type { PipelineDetail, NodeType } from '$lib/types/index.js';
+import type { PipelineDetail, PipelineParameter, NodeType, NodeUpdate } from '$lib/types/index.js';
 import {
 	backendNodeToFlowNode,
 	backendEdgeToFlowEdge,
@@ -16,6 +16,7 @@ interface PipelineState {
 	edges: Edge[];
 	loading: boolean;
 	error: string | null;
+	selectedNodeId: string | null;
 }
 
 const initial: PipelineState = {
@@ -23,7 +24,8 @@ const initial: PipelineState = {
 	nodes: [],
 	edges: [],
 	loading: false,
-	error: null
+	error: null,
+	selectedNodeId: null
 };
 
 export const pipelineStore = writable<PipelineState>(initial);
@@ -40,7 +42,7 @@ export async function loadPipeline(id: string) {
 		const pipeline = await api.pipelines.get(id);
 		const nodes = pipeline.nodes.map(backendNodeToFlowNode);
 		const edges = pipeline.edges.map(backendEdgeToFlowEdge);
-		pipelineStore.set({ pipeline, nodes, edges, loading: false, error: null });
+		pipelineStore.set({ pipeline, nodes, edges, loading: false, error: null, selectedNodeId: null });
 	} catch (e) {
 		pipelineStore.update((s) => ({ ...s, loading: false, error: errorMsg(e) }));
 	}
@@ -141,9 +143,48 @@ export async function updatePipelineName(pipelineId: string, name: string) {
 	}
 }
 
-export async function runPipeline(pipelineId: string) {
+export function selectNode(nodeId: string | null) {
+	pipelineStore.update((s) => ({ ...s, selectedNodeId: nodeId }));
+}
+
+export async function updateNodeConfig(pipelineId: string, nodeId: string, data: NodeUpdate) {
 	try {
-		const result = await api.execution.run(pipelineId);
+		const updated = await api.nodes.update(pipelineId, nodeId, data);
+		const flowNode = backendNodeToFlowNode(updated);
+		pipelineStore.update((s) => ({
+			...s,
+			nodes: s.nodes.map((n) => (n.id === nodeId ? { ...n, data: flowNode.data } : n))
+		}));
+	} catch (e) {
+		addToast(errorMsg(e), 'error');
+	}
+}
+
+export async function updatePipelineParams(
+	pipelineId: string,
+	parameters: PipelineParameter[]
+) {
+	try {
+		const updated = await api.pipelines.update(pipelineId, { parameters });
+		pipelineStore.update((s) => {
+			if (!s.pipeline) return s;
+			return {
+				...s,
+				pipeline: { ...s.pipeline, parameters: updated.parameters ?? [] }
+			};
+		});
+		addToast('Parameters saved', 'success');
+	} catch (e) {
+		addToast(errorMsg(e), 'error');
+	}
+}
+
+export async function runPipeline(
+	pipelineId: string,
+	parameters: Record<string, unknown> = {}
+) {
+	try {
+		const result = await api.execution.run(pipelineId, { parameters });
 		if (result.status === 'success') {
 			addToast(
 				`Run complete: ${result.row_count ?? 0} rows in ${result.duration_ms}ms`,

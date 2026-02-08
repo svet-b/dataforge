@@ -11,7 +11,10 @@ import type {
 	EdgeCreate,
 	RunRequest,
 	RunResponse,
-	NodePreviewResponse
+	NodePreviewResponse,
+	UploadedFileResponse,
+	RunHistorySummary,
+	RunHistoryDetail
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -44,6 +47,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 		throw new ApiError(res.status, detail);
 	}
 	if (res.status === 204) return undefined as T;
+	return res.json();
+}
+
+async function requestFormData<T>(method: string, path: string, formData: FormData): Promise<T> {
+	const res = await fetch(path, { method, body: formData });
+	if (!res.ok) {
+		let detail = res.statusText;
+		try {
+			const json = await res.json();
+			detail = json.detail ?? JSON.stringify(json);
+		} catch {
+			// use statusText
+		}
+		throw new ApiError(res.status, detail);
+	}
 	return res.json();
 }
 
@@ -84,5 +102,29 @@ export const api = {
 				`/api/pipelines/${pipelineId}/preview/${nodeId}`,
 				data
 			)
+	},
+	files: {
+		upload: (pipelineId: string, file: File) => {
+			const fd = new FormData();
+			fd.append('file', file);
+			return requestFormData<UploadedFileResponse>(
+				'POST',
+				`/api/pipelines/${pipelineId}/files`,
+				fd
+			);
+		},
+		list: (pipelineId: string) =>
+			request<UploadedFileResponse[]>('GET', `/api/pipelines/${pipelineId}/files`),
+		delete: (pipelineId: string, fileId: string) =>
+			request<void>('DELETE', `/api/pipelines/${pipelineId}/files/${fileId}`)
+	},
+	runs: {
+		list: (pipelineId: string, limit = 20) =>
+			request<RunHistorySummary[]>(
+				'GET',
+				`/api/pipelines/${pipelineId}/runs?limit=${limit}`
+			),
+		get: (pipelineId: string, runId: string) =>
+			request<RunHistoryDetail>('GET', `/api/pipelines/${pipelineId}/runs/${runId}`)
 	}
 };

@@ -97,6 +97,38 @@ export interface RunResponse {
 	node_timings: Record<string, unknown>;
 }
 
-export interface NodePreviewResponse extends RunResponse {
-	schema_info: Record<string, string>[];
+export interface SchemaColumn {
+	name: string;
+	type: string;
 }
+
+export interface NodePreviewResponse extends RunResponse {
+	schema_info: SchemaColumn[];
+}
+
+export interface UploadedFileResponse {
+	id: string;
+	pipeline_id: string;
+	filename: string;
+	file_type: string;
+	uploaded_at: string;
+}
+
+export interface RunHistorySummary {
+	id: string;
+	pipeline_id: string;
+	parameters: Record<string, unknown>;
+	status: string;
+	started_at: string;
+	duration_ms: number;
+	row_count: number | null;
+	error: string | null;
+}
+
+export interface RunHistoryDetail extends RunHistorySummary {
+	completed_at: string | null;
+	output_preview: Record<string, unknown>[] | null;
+	node_timings: Record<string, number>;
+}
+
+export type NodeStatus = 'idle' | 'running' | 'success' | 'error' | 'stale';

@@ -22,11 +22,13 @@
 		pipelineId,
 		nodes = $bindable<Node<FlowNodeData>[]>([]),
 		edges = $bindable<Edge[]>([]),
+		onNodeSelect,
 		children
 	}: {
 		pipelineId: string;
 		nodes: Node<FlowNodeData>[];
 		edges: Edge[];
+		onNodeSelect?: (nodeId: string | null) => void;
 		children?: Snippet;
 	} = $props();
 
@@ -56,6 +58,14 @@
 		}
 	}
 
+	function onnodeclick({ node }: { event: MouseEvent | TouchEvent; node: Node }) {
+		onNodeSelect?.(node.id);
+	}
+
+	function onpaneclick() {
+		onNodeSelect?.(null);
+	}
+
 	function ondelete({ nodes: deletedNodes, edges: deletedEdges }: { nodes: Node[]; edges: Edge[] }) {
 		for (const node of deletedNodes) {
 			deleteNodeAction(pipelineId, node.id);
@@ -72,6 +82,8 @@
 		bind:edges
 		{nodeTypes}
 		{onconnect}
+		{onnodeclick}
+		{onpaneclick}
 		{onnodedragstop}
 		{ondelete}
 		fitView
