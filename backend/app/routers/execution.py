@@ -13,6 +13,7 @@ from app.database import get_db
 from app.engine.executor import PipelineExecutor
 from app.models.pipeline import Pipeline
 from app.models.run import RunHistory
+from app.models.uploaded_file import UploadedFile
 from app.schemas.execution import NodePreviewResponse, RunRequest, RunResponse
 
 router = APIRouter(prefix="/api/pipelines", tags=["execution"])
@@ -40,16 +41,31 @@ def _load_pipeline(pipeline_id: str, db: Session) -> tuple[Pipeline, _NodeList, 
     if not pipeline:
         raise HTTPException(status_code=404, detail="Pipeline not found")
 
-    nodes = [
-        {
-            "id": n.id,
-            "type": n.type,
-            "name": n.name,
-            "config": n.config,
-            "output_table_name": n.output_table_name,
-        }
-        for n in pipeline.nodes
-    ]
+    # Build a filename → storage_path lookup for uploaded files
+    uploaded_files = (
+        db.query(UploadedFile)
+        .filter(UploadedFile.pipeline_id == pipeline_id)
+        .all()
+    )
+    file_path_map = {uf.filename: uf.storage_path for uf in uploaded_files}
+
+    nodes = []
+    for n in pipeline.nodes:
+        config = dict(n.config)
+        # Resolve filename to file_path for source_file nodes
+        if n.type == "source_file" and "filename" in config and "file_path" not in config:
+            filename = config["filename"]
+            if filename in file_path_map:
+                config["file_path"] = file_path_map[filename]
+        nodes.append(
+            {
+                "id": n.id,
+                "type": n.type,
+                "name": n.name,
+                "config": config,
+                "output_table_name": n.output_table_name,
+            }
+        )
     edges = [
         {
             "source_node_id": e.source_node_id,
