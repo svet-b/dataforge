@@ -15,7 +15,7 @@
 </script>
 
 {#if !selectedNode}
-	<div class="flex h-full items-center justify-center text-sm text-gray-400">
+	<div class="flex h-full items-center justify-center text-sm text-gray-400" data-testid="config-placeholder">
 		Select a node to configure
 	</div>
 {:else if selectedNode.data.backendType === 'source_api'}

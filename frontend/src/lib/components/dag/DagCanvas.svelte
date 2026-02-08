@@ -76,7 +76,7 @@
 	}
 </script>
 
-<div class="h-full w-full">
+<div class="h-full w-full" data-testid="dag-canvas">
 	<SvelteFlow
 		bind:nodes
 		bind:edges

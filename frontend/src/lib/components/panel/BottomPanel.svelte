@@ -36,7 +36,7 @@
 </script>
 
 {#if panelHeight > 0}
-	<div class="flex flex-col border-t border-gray-200 bg-white" style="height: {panelHeight}px;">
+	<div class="flex flex-col border-t border-gray-200 bg-white" data-testid="bottom-panel" style="height: {panelHeight}px;">
 		<!-- Resize handle -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
@@ -52,6 +52,7 @@
 		<div class="flex gap-0 border-b border-gray-200 px-2">
 			{#each tabs as tab}
 				<button
+					data-testid="tab-{tab.id}"
 					class="px-3 py-1.5 text-xs font-medium transition-colors {activeTab === tab.id
 						? 'border-b-2 border-blue-500 text-blue-600'
 						: 'text-gray-500 hover:text-gray-700'}"

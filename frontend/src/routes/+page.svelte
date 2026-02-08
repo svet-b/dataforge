@@ -78,14 +78,14 @@
 		{#if loading}
 			<div class="py-12 text-center text-gray-500">Loading...</div>
 		{:else if pipelines.length === 0}
-			<div class="py-12 text-center">
+			<div class="py-12 text-center" data-testid="empty-state">
 				<p class="text-lg text-gray-500">No pipelines yet</p>
 				<p class="mt-1 text-sm text-gray-400">Create your first pipeline to get started.</p>
 			</div>
 		{:else}
-			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="pipeline-grid">
 				{#each pipelines as pipeline (pipeline.id)}
-					<div class="relative rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+					<div class="relative rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow" data-testid="pipeline-card">
 						<a
 							href="/pipelines/{pipeline.id}"
 							class="block"
@@ -119,7 +119,7 @@
 <!-- Create Modal -->
 {#if showCreateModal}
 	<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
-		<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+		<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl" data-testid="create-pipeline-modal">
 			<h2 class="text-lg font-semibold text-gray-900">New Pipeline</h2>
 			<div class="mt-4 space-y-3">
 				<div>
@@ -166,7 +166,7 @@
 <!-- Delete Confirm Modal -->
 {#if confirmDeleteId}
 	<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
-		<div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+		<div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl" data-testid="delete-confirm-modal">
 			<h2 class="text-lg font-semibold text-gray-900">Delete Pipeline?</h2>
 			<p class="mt-2 text-sm text-gray-500">This action cannot be undone. All nodes and edges will be permanently deleted.</p>
 			<div class="mt-5 flex justify-end gap-2">

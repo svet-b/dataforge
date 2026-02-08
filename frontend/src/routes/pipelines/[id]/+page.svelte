@@ -76,7 +76,7 @@
 		Error: {$pipelineStore.error}
 	</div>
 {:else if $pipelineStore.pipeline}
-	<div class="flex h-screen flex-col">
+	<div class="flex h-screen flex-col" data-testid="pipeline-editor">
 		<Toolbar
 			{pipelineId}
 			pipelineName={$pipelineStore.pipeline.name}

@@ -70,7 +70,7 @@
 	class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
 	onclick={onBackdropClick}
 >
-	<div class="w-full max-w-xl rounded-lg bg-white p-5 shadow-xl">
+	<div class="w-full max-w-xl rounded-lg bg-white p-5 shadow-xl" data-testid="parameter-modal">
 		<h2 class="mb-4 text-lg font-semibold text-gray-800">Pipeline Parameters</h2>
 
 		{#if nameError}

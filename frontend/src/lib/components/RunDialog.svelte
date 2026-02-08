@@ -65,7 +65,7 @@
 	class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
 	onclick={onBackdropClick}
 >
-	<div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+	<div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl" data-testid="run-dialog">
 		<h2 class="mb-4 text-lg font-semibold text-gray-800">Run Pipeline</h2>
 
 		{#if parameters.length > 0}
@@ -109,6 +109,7 @@
 				Cancel
 			</button>
 			<button
+				data-testid="run-execute-btn"
 				class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
 				onclick={handleRun}
 				disabled={running}

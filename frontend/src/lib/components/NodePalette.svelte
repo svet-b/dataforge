@@ -27,6 +27,7 @@
 <Panel position="top-right" class="flex gap-2">
 	{#each buttons as btn}
 		<button
+			data-testid="add-node-{btn.type}"
 			class="{btn.color} rounded px-3 py-1.5 text-xs font-medium text-white shadow transition-colors"
 			onclick={() => addNode(btn.type)}
 		>
