@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,6 +20,19 @@ router = APIRouter(prefix="/api/pipelines", tags=["execution"])
 
 _NodeList = list[dict[str, Any]]
 _EdgeList = list[dict[str, Any]]
+
+
+def _json_safe(obj: Any) -> Any:
+    """Recursively convert non-JSON-serializable values to strings."""
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, Decimal):
+        return float(obj)
+    return obj
 
 
 def _load_pipeline(pipeline_id: str, db: Session) -> tuple[Pipeline, _NodeList, _EdgeList]:
@@ -92,7 +106,7 @@ async def run_pipeline(
         completed_at=now,
         duration_ms=exec_result.duration_ms,
         row_count=exec_result.row_count,
-        output_preview={"data": exec_result.data[:50]} if exec_result.data else None,
+        output_preview=_json_safe({"data": exec_result.data[:50]}) if exec_result.data else None,
         error=exec_result.error,
         node_timings=exec_result.node_timings,
     )

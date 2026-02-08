@@ -13,6 +13,14 @@ class NodeCreate(BaseModel):
     output_table_name: str
 
 
+class NodeUpdate(BaseModel):
+    name: str | None = None
+    position_x: float | None = None
+    position_y: float | None = None
+    config: dict[str, Any] | None = None
+    output_table_name: str | None = None
+
+
 class NodeResponse(BaseModel):
     id: UUID
     pipeline_id: UUID

@@ -20,11 +20,27 @@ class PipelineCreate(BaseModel):
     parameters: list[PipelineParameter] = []
 
 
+class PipelineUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    parameters: list[PipelineParameter] | None = None
+
+
 class PipelineResponse(BaseModel):
     id: UUID
     name: str
     description: str | None
     parameters: list[PipelineParameter]
+    created_at: datetime
+    updated_at: datetime
+
+
+class PipelineSummaryResponse(BaseModel):
+    id: UUID
+    name: str
+    description: str | None
+    parameter_count: int
+    node_count: int
     created_at: datetime
     updated_at: datetime
 
