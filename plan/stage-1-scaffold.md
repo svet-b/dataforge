@@ -2,7 +2,7 @@
 
 ## Objective
 
-Set up the project skeleton: Docker dev environment, FastAPI backend with sync SQLAlchemy and SQLite, Alembic migrations, and Pydantic models. The backend uses Python 3.13 with uv for dependency management, ruff for formatting, and ty for type-checking. At the end of this stage, `docker compose up` starts a working FastAPI server connected to SQLite with all tables created.
+Set up the project skeleton: Docker dev environment, FastAPI backend with sync SQLAlchemy and SQLite, Alembic migrations, and Pydantic models. The backend uses Python 3.13 with uv for dependency management, ruff for formatting, and mypy for type-checking. At the end of this stage, `docker compose up` starts a working FastAPI server connected to SQLite with all tables created.
 
 ## What You Are Building
 
@@ -75,7 +75,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 ```
 backend/
-├── pyproject.toml            # Managed by uv; includes ruff + ty config
+├── pyproject.toml            # Managed by uv; includes ruff + mypy config
 ├── uv.lock
 ├── alembic.ini
 ├── alembic/
@@ -133,7 +133,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "httpx",
     "ruff>=0.11",
-    "ty>=0.0.15",
+    "mypy>=1",
 ]
 
 [tool.ruff]
@@ -151,7 +151,7 @@ Run `uv sync` to install all dependencies and generate `uv.lock`.
 **Tooling commands:**
 - `uv run ruff format .` — format all Python files
 - `uv run ruff check .` — lint all Python files
-- `uv run ty check` — type-check all Python files
+- `uv run mypy app` — type-check all Python files
 - `uv run pytest` — run tests
 
 ### 4. Configuration (config.py)
@@ -391,7 +391,7 @@ Before this stage is complete, verify:
 - [ ] `uv run pytest` passes with the health check test
 - [ ] `uv run ruff check .` reports no lint errors
 - [ ] `uv run ruff format --check .` reports no formatting issues
-- [ ] `uv run ty check` reports no type errors (or only expected ones from third-party stubs)
+- [ ] `uv run mypy app` reports no type errors (or only expected ones from third-party stubs)
 
 ## What NOT to Build
 

@@ -124,7 +124,7 @@ Each Claude Code session has limited context. To keep agents focused:
 
 **Spec file:** `stage-1-scaffold.md`
 
-**What it does:** Sets up the project skeleton — Docker dev environment, SQLite, FastAPI with sync SQLAlchemy, Alembic migrations, and basic Pydantic models. The backend uses Python 3.13 with uv for dependency management, ruff for formatting, and ty for type-checking. At the end of this stage, you can `docker compose up` and have a running FastAPI server connected to SQLite.
+**What it does:** Sets up the project skeleton — Docker dev environment, SQLite, FastAPI with sync SQLAlchemy, Alembic migrations, and basic Pydantic models. The backend uses Python 3.13 with uv for dependency management, ruff for formatting, and mypy for type-checking. At the end of this stage, you can `docker compose up` and have a running FastAPI server connected to SQLite.
 
 **Prompt for Claude Code:**
 

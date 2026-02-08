@@ -11,7 +11,7 @@ Stage 1 is complete. The project has:
 - FastAPI app with sync SQLAlchemy
 - All database models and Pydantic schemas
 - Health check endpoint
-- Python 3.13, uv, ruff, ty toolchain
+- Python 3.13, uv, ruff, mypy toolchain
 
 **Read the existing code first** to understand naming conventions, import patterns, and project structure before adding new files.
 

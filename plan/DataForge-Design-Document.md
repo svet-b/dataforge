@@ -1009,7 +1009,7 @@ Deliverables:
 | Migrations | Alembic | Reliable schema evolution |
 | Package manager | uv (astral.sh) | Fast Python package and project manager |
 | Formatter | ruff | Fast Python linter and formatter |
-| Type checker | ty (astral.sh) | Fast Python type checker |
+| Type checker | mypy | Established type checker |
 | HTTP client | httpx | Async Python HTTP client for API source connectors |
 | LLM client | anthropic SDK | Claude API for LLM-assisted SQL generation |
 | Containerization | Docker Compose | Dev environment with hot-reload |
