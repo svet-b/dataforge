@@ -15,42 +15,40 @@ The key principles behind this decomposition:
 
 ```
 dataforge/
-├── docker-compose.yml
-├── docker-compose.dev.yml
-├── Dockerfile
+├── docker-compose.yml            # Dev environment
+├── Dockerfile                    # Backend dev container
 ├── .env.example
 ├── README.md
 ├── backend/
 │   ├── pyproject.toml
+│   ├── uv.lock                   # Managed by uv
 │   ├── alembic.ini
 │   ├── alembic/
 │   │   └── versions/
 │   ├── app/
 │   │   ├── main.py
 │   │   ├── config.py
-│   │   ├── database.py
+│   │   ├── database.py           # Sync SQLAlchemy + SQLite
 │   │   ├── models/
 │   │   │   ├── pipeline.py
 │   │   │   ├── node.py
 │   │   │   ├── edge.py
 │   │   │   └── run.py
-│   │   ├── schemas/                 # Pydantic request/response models
+│   │   ├── schemas/              # Pydantic request/response models
 │   │   ├── routers/
 │   │   │   ├── pipelines.py
 │   │   │   ├── execution.py
 │   │   │   └── llm.py
 │   │   ├── engine/
-│   │   │   ├── executor.py          # Pipeline execution engine
-│   │   │   ├── dag.py               # DAG resolution / topological sort
-│   │   │   └── duckdb_manager.py    # DuckDB session management
+│   │   │   ├── executor.py       # Pipeline execution engine
+│   │   │   ├── dag.py            # DAG resolution / topological sort
+│   │   │   └── duckdb_manager.py # DuckDB session management
 │   │   ├── connectors/
 │   │   │   ├── base.py
 │   │   │   ├── api_connector.py
 │   │   │   └── file_connector.py
 │   │   └── llm/
-│   │       ├── base.py
 │   │       ├── claude_provider.py
-│   │       ├── openai_provider.py
 │   │       └── prompts.py
 │   └── tests/
 │       ├── test_dag.py
@@ -87,12 +85,12 @@ dataforge/
 
 | Stage | Name | Depends On | Focus | Estimated Effort |
 |-------|------|------------|-------|-----------------|
-| 1 | Project Scaffold & Database | — | Docker, Postgres, FastAPI, Alembic, basic models | 1–2 hours |
+| 1 | Project Scaffold & Database | — | Docker, SQLite, FastAPI, Alembic, basic models | 1–2 hours |
 | 2 | Pipeline Execution Engine | Stage 1 | DuckDB engine, DAG resolution, connectors, execution API | 2–3 hours |
 | 3 | Pipeline Management API | Stages 1–2 | Full CRUD endpoints, file upload, validation | 1–2 hours |
 | 4 | Frontend Foundation | Stages 1–3 | SvelteKit scaffold, DAG editor, node config panels | 2–3 hours |
 | 5 | Frontend Interactive Features | Stages 1–4 | Data preview, SQL editor, parameter management, run history | 2–3 hours |
-| 6 | LLM Integration | Stages 1–5 | LLM service, SQL generation, chat UI panel | 1–2 hours |
+| 6 | LLM Integration | Stages 1–5 | Claude LLM service, SQL generation, chat UI panel | 1–2 hours |
 
 ## How to Use This Plan
 
@@ -100,7 +98,7 @@ dataforge/
 
 Before starting, ensure you have:
 - A working directory for the project (e.g., `~/projects/dataforge`)
-- Docker and docker-compose installed
+- Docker (with Compose) installed
 - The design document (`DataForge-Design-Document.md`) available for reference
 - The stage-specific spec files (provided alongside this document)
 
@@ -126,7 +124,7 @@ Each Claude Code session has limited context. To keep agents focused:
 
 **Spec file:** `stage-1-scaffold.md`
 
-**What it does:** Sets up the project skeleton — Docker, Postgres, FastAPI with async SQLAlchemy, Alembic migrations, and basic Pydantic models. At the end of this stage, you can `docker-compose up` and have a running FastAPI server connected to Postgres.
+**What it does:** Sets up the project skeleton — Docker dev environment, SQLite, FastAPI with sync SQLAlchemy, Alembic migrations, and basic Pydantic models. The backend uses Python 3.13 with uv for dependency management, ruff for formatting, and ty for type-checking. At the end of this stage, you can `docker compose up` and have a running FastAPI server connected to SQLite.
 
 **Prompt for Claude Code:**
 
@@ -135,7 +133,7 @@ Read the spec file @plan/stage-1-scaffold.md and implement it fully.
 
 You are building the foundation for a data pipeline platform called DataForge. This stage sets up the project structure, Docker environment, database, and basic FastAPI application.
 
-Work in the current directory. Create all files, ensure docker-compose up works, and verify the acceptance criteria listed in the spec. Run the tests you write to make sure everything passes.
+Work in the current directory. Create all files, ensure docker compose up works, and verify the acceptance criteria listed in the spec. Run the tests you write to make sure everything passes.
 
 Do NOT implement the pipeline execution engine, frontend, or LLM integration — those come in later stages. Focus only on what's specified in the spec.
 ```
@@ -146,14 +144,14 @@ Do NOT implement the pipeline execution engine, frontend, or LLM integration —
 
 **Spec file:** `stage-2-execution-engine.md`
 
-**What it does:** Implements the core DuckDB-based execution engine — DAG resolution, node execution in topological order, parameter injection, source connectors (file + API), and the `/run` and `/preview` API endpoints. This is the most complex backend stage.
+**What it does:** Implements the core DuckDB-based execution engine — DAG resolution, node execution in topological order, parameter injection, source connectors (file + API), and the `/run` and `/preview` API endpoints. This is the most complex backend stage. Database access uses sync SQLAlchemy (SQLite), while connectors use async httpx for HTTP calls.
 
 **Prompt for Claude Code:**
 
 ```
 Read the spec file @plan/stage-2-execution-engine.md and implement it fully.
 
-You are adding the pipeline execution engine to an existing DataForge project. The project scaffold (FastAPI, Postgres, Alembic, models) already exists from a previous stage — read the existing code first to understand the patterns and conventions before adding new code.
+You are adding the pipeline execution engine to an existing DataForge project. The project scaffold (FastAPI, SQLite, Alembic, models) already exists from a previous stage — read the existing code first to understand the patterns and conventions before adding new code.
 
 Implement the DuckDB execution engine, DAG resolver, source connectors, and execution API endpoints. Write tests for the DAG resolver and executor using the sample data fixtures described in the spec.
 
@@ -228,7 +226,7 @@ Test each feature against the running backend. Verify you can configure nodes, w
 
 **Spec file:** `stage-6-llm-integration.md`
 
-**What it does:** Adds the LLM service abstraction, Claude/OpenAI/Ollama providers, the `/api/llm/generate-sql` endpoint, and the LLM chat panel in the frontend. This is the final layer.
+**What it does:** Adds the Claude (Anthropic) LLM provider, the `/api/llm/generate-sql` endpoint, and the LLM chat panel in the frontend. This is the final layer.
 
 **Prompt for Claude Code:**
 
@@ -237,7 +235,7 @@ Read the spec file @plan/stage-6-llm-integration.md and implement it fully.
 
 You are adding LLM-assisted SQL generation to the existing DataForge platform. Both the backend and frontend already exist — read the existing code to understand patterns.
 
-Implement the pluggable LLM provider system, the SQL generation endpoint, and the chat panel in the frontend. The system prompt for SQL generation is critical — pay close attention to the DuckDB dialect specifics in the spec.
+Implement the Claude LLM provider, the SQL generation endpoint, and the chat panel in the frontend. The system prompt for SQL generation is critical — pay close attention to the DuckDB dialect specifics in the spec.
 
 Test with a real API key if available, or mock the LLM responses for automated tests.
 ```
@@ -248,7 +246,7 @@ Test with a real API key if available, or mock the LLM responses for automated t
 
 After all 6 stages are complete, do a final review pass:
 
-- [ ] `docker-compose up` starts both services cleanly
+- [ ] `docker compose up` starts the backend and frontend dev servers cleanly
 - [ ] Frontend loads at `http://localhost:5173` (dev) or `http://localhost:8000` (prod build)
 - [ ] Can create a pipeline, add source + transform + output nodes, connect them
 - [ ] Can upload a CSV file as a source
@@ -267,6 +265,6 @@ After all 6 stages are complete, do a final review pass:
 
 3. **If a stage fails, re-run it** rather than trying to fix issues in the next stage. Each stage should leave the codebase in a clean, working state.
 
-4. **Provide the .env file** with at least `DB_PASSWORD` and optionally `ANTHROPIC_API_KEY` so the agent can test against real services.
+4. **Provide the .env file** with `ANTHROPIC_API_KEY` so the agent can test LLM integration.
 
-5. **For Stage 4+, have the backend running** (`docker-compose up postgres app`) so the frontend agent can test API integration live.
+5. **For Stage 4+, have the backend running** (`docker compose up backend`) so the frontend agent can test API integration live.

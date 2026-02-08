@@ -64,7 +64,7 @@ With DataForge, this worker:
           ┌─────────────┼─────────────┐
           ▼             ▼             ▼
     ┌──────────┐  ┌──────────┐  ┌──────────┐
-    │ Upstream  │  │ Uploaded │  │ Postgres │
+    │ Upstream  │  │ Uploaded │  │ SQLite   │
     │ REST APIs │  │ Files    │  │ (metadata│
     │           │  │          │  │  store)  │
     └──────────┘  └──────────┘  └──────────┘
@@ -81,7 +81,7 @@ With DataForge, this worker:
 | **Source Connectors** | Fetch data from upstream REST APIs or load uploaded files into DuckDB tables. |
 | **DuckDB Manager** | Creates and manages ephemeral DuckDB instances per pipeline execution. Handles table registration, query execution, and result extraction. |
 | **Run History Store** | Persists the last N runs per pipeline (parameters, timing, status, output summary, errors). |
-| **PostgreSQL (Metadata Store)** | Stores pipeline definitions, node configs, parameters, and run history. Runs as a separate container in docker-compose. Provides robust concurrent access, JSONB indexing, and production-grade reliability from day one. |
+| **SQLite (Metadata Store)** | Stores pipeline definitions, node configs, parameters, and run history. Embedded database stored as a single file — no separate container or process needed. Simple, zero-configuration, and perfectly suited for a single-user self-hosted tool. |
 
 ### 2.3 Design Principles
 
@@ -243,85 +243,81 @@ The `sql` field is the actual DuckDB SQL that will be executed. The `llm_prompt`
 
 The output node simply designates which table's contents become the pipeline's result. A pipeline must have exactly one output node (v1 simplification — multiple outputs can be added later).
 
-### 3.3 Metadata Storage (PostgreSQL)
+### 3.3 Metadata Storage (SQLite)
 
-PostgreSQL stores all pipeline definitions, uploaded file metadata, and run history. Runs as a dedicated container in docker-compose, providing JSONB indexing, robust concurrent access, and a production-grade foundation from day one.
+SQLite stores all pipeline definitions, uploaded file metadata, and run history. It is an embedded database — a single file on disk with no separate server process. This keeps the deployment simple and is well-suited for a single-user, self-hosted tool.
 
 Schema:
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
 CREATE TABLE pipelines (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,  -- UUID generated in Python
     name TEXT NOT NULL,
     description TEXT,
-    parameters JSONB NOT NULL DEFAULT '[]'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    parameters JSON NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,  -- ISO 8601 timestamps
+    updated_at TEXT NOT NULL
 );
 
 CREATE TABLE nodes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    pipeline_id UUID NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    pipeline_id TEXT NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
     type TEXT NOT NULL CHECK (type IN ('source_api', 'source_file', 'transform', 'output')),
     name TEXT NOT NULL,
     position_x REAL NOT NULL DEFAULT 0,
     position_y REAL NOT NULL DEFAULT 0,
-    config JSONB NOT NULL DEFAULT '{}'::jsonb,
+    config JSON NOT NULL DEFAULT '{}',
     output_table_name TEXT NOT NULL
 );
 
 CREATE INDEX idx_nodes_pipeline ON nodes(pipeline_id);
 
 CREATE TABLE edges (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    pipeline_id UUID NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
-    source_node_id UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-    target_node_id UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE
+    id TEXT PRIMARY KEY,
+    pipeline_id TEXT NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+    source_node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    target_node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_edges_pipeline ON edges(pipeline_id);
 
 CREATE TABLE uploaded_files (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    pipeline_id UUID NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    pipeline_id TEXT NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
     file_type TEXT NOT NULL,
     storage_path TEXT NOT NULL,
-    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    uploaded_at TEXT NOT NULL
 );
 
 CREATE TABLE run_history (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    pipeline_id UUID NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
-    parameters JSONB NOT NULL DEFAULT '{}'::jsonb,
+    id TEXT PRIMARY KEY,
+    pipeline_id TEXT NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+    parameters JSON NOT NULL DEFAULT '{}',
     status TEXT NOT NULL CHECK (status IN ('running', 'success', 'failed')),
-    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    completed_at TIMESTAMPTZ,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
     duration_ms INTEGER,
     row_count INTEGER,
-    output_preview JSONB,                    -- First 100 rows
-    error JSONB,
-    node_timings JSONB
+    output_preview JSON,    -- First 100 rows
+    error JSON,
+    node_timings JSON
 );
 
--- Index for efficient run history queries and cleanup
 CREATE INDEX idx_run_history_pipeline ON run_history(pipeline_id, started_at DESC);
-
--- GIN index on pipeline parameters for potential future querying
-CREATE INDEX idx_pipelines_parameters ON pipelines USING GIN (parameters);
 ```
 
-**Database connection:** The backend connects via `asyncpg` (async Postgres driver) through SQLAlchemy's async engine, or directly via `asyncpg` with a connection pool. Configuration:
+**Notes on SQLite specifics:**
+- UUIDs are stored as TEXT and generated in Python (`uuid.uuid4()`).
+- Timestamps are stored as ISO 8601 TEXT strings and generated in Python.
+- JSON columns use SQLite's built-in JSON support (available since SQLite 3.38+).
+- Foreign key enforcement must be enabled per connection: `PRAGMA foreign_keys = ON`.
+
+**Database connection:** The backend connects via SQLAlchemy's synchronous engine with the `sqlite3` stdlib driver. Configuration:
 
 ```yaml
 database:
-  host: "${DB_HOST:-postgres}"
-  port: ${DB_PORT:-5432}
-  name: "${DB_NAME:-dataforge}"
-  user: "${DB_USER:-dataforge}"
-  password: "${DB_PASSWORD}"
+  url: "sqlite:///data/dataforge.db"
 ```
 
 **Migrations:** Use Alembic for schema migrations, ensuring smooth upgrades as the schema evolves.
@@ -563,15 +559,7 @@ class LLMProvider(Protocol):
         ...
 
 class ClaudeProvider(LLMProvider):
-    """Default provider using Anthropic Claude API."""
-    ...
-
-class OpenAIProvider(LLMProvider):
-    """Alternative provider for OpenAI-compatible APIs."""
-    ...
-
-class OllamaProvider(LLMProvider):
-    """Provider for local Ollama models."""
+    """Provider using Anthropic Claude API."""
     ...
 ```
 
@@ -579,10 +567,8 @@ Configuration is via environment variables or a config file:
 
 ```yaml
 llm:
-  provider: "claude"           # claude | openai | ollama
   api_key: "${ANTHROPIC_API_KEY}"
   model: "claude-sonnet-4-5-20250929"
-  base_url: null               # Override for custom endpoints
 ```
 
 ### 6.2 System Prompt for SQL Generation
@@ -821,18 +807,13 @@ server:
   port: 8000
 
 database:
-  host: "${DB_HOST:-postgres}"
-  port: ${DB_PORT:-5432}
-  name: "${DB_NAME:-dataforge}"
-  user: "${DB_USER:-dataforge}"
-  password: "${DB_PASSWORD}"
+  url: "sqlite:///data/dataforge.db"
 
 storage:
   data_dir: "/data"            # Uploaded files, cache, temp files
   max_run_history: 20          # Runs to keep per pipeline
 
 llm:
-  provider: "claude"
   model: "claude-sonnet-4-5-20250929"
   api_key: "${ANTHROPIC_API_KEY}"
 
@@ -842,74 +823,72 @@ execution:
   preview_cache_ttl: 300       # Seconds to cache API responses as Parquet during preview
 ```
 
-### 9.2 Docker Deployment
+### 9.2 Docker Development Environment
 
-The application runs as two containers via docker-compose: the application server and PostgreSQL.
+The application uses Docker Compose for local development. Since we use SQLite (embedded), there is no separate database container. The compose file mounts source directories as volumes for hot-reload.
 
 ```yaml
-# docker-compose.yml
-version: "3.8"
-
+# docker-compose.yml  (development)
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: dataforge
-      POSTGRES_USER: dataforge
-      POSTGRES_PASSWORD: "${DB_PASSWORD:-changeme}"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dataforge"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  app:
-    build: .
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
-      DB_HOST: postgres
-      DB_PASSWORD: "${DB_PASSWORD:-changeme}"
-      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
+      DATABASE_URL: "sqlite:////data/dataforge.db"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
     volumes:
+      - ./backend:/app/backend
       - appdata:/data
-    depends_on:
-      postgres:
-        condition: service_healthy
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
 
 volumes:
-  pgdata:
   appdata:
 ```
 
 ```dockerfile
-# Dockerfile
-FROM python:3.12-slim
+# Dockerfile  (backend, development)
+FROM python:3.13-slim
 
-# Install Node.js for SvelteKit build
-RUN apt-get update && apt-get install -y nodejs npm
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Backend
-COPY backend/ /app/backend/
-WORKDIR /app/backend
-RUN pip install -r requirements.txt
-
-# Frontend
-COPY frontend/ /app/frontend/
-WORKDIR /app/frontend
-RUN npm ci && npm run build
-
-# Run Alembic migrations on startup, then start the server
 WORKDIR /app
-EXPOSE 8000
-CMD ["sh", "-c", "cd backend && alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
+
+# Copy dependency files and install
+COPY backend/pyproject.toml backend/uv.lock ./backend/
+RUN cd backend && uv sync
+
+# Source code is volume-mounted in dev, but copy for image layer caching
+COPY backend/ ./backend/
+
+WORKDIR /app/backend
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 ```
 
-For development, the same docker-compose file works — mount source directories as volumes and use hot-reload for both the SvelteKit dev server and uvicorn.
+```dockerfile
+# frontend/Dockerfile.dev
+FROM node:20-slim
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+```
 
 ### 9.3 Data Directory Structure
 
@@ -924,7 +903,7 @@ For development, the same docker-compose file works — mount source directories
   temp/                     # Ephemeral files (ndjson API responses, etc.)
 ```
 
-Note: Pipeline metadata lives in PostgreSQL, not on the filesystem. The `/data` directory only holds uploaded files, cached Parquet, and ephemeral temp files.
+The `/data` directory holds the SQLite database file, uploaded files, cached Parquet, and ephemeral temp files.
 
 ---
 
@@ -965,7 +944,7 @@ When fetching from upstream APIs:
 
 Deliverables:
 
-- FastAPI project scaffold with SQLite metadata store
+- FastAPI project scaffold with SQLite metadata store (sync SQLAlchemy)
 - Pipeline, Node, Edge CRUD endpoints
 - DuckDB execution engine: topological sort, node execution, parameter injection
 - File source connector (CSV only)
@@ -991,12 +970,11 @@ Deliverables:
 
 Deliverables:
 
-- LLM service abstraction with Claude provider
+- LLM service with Claude (Anthropic) provider
 - System prompt engineering for DuckDB SQL generation
 - LLM chat panel in the frontend (per transform node)
 - Schema context injection (upstream table schemas passed to LLM)
 - Iterative refinement (conversation history maintained per node)
-- OpenAI and Ollama provider implementations
 
 ### Phase 4: Production Readiness (Weeks 9–10)
 
@@ -1008,7 +986,7 @@ Deliverables:
 - Error handling and display (per-node errors, clear messages)
 - Execution timeout and memory limits
 - Preview caching for API sources
-- Docker image and docker-compose.yml
+- Docker Compose dev environment
 - Configuration via environment variables and config.yaml
 - Security hardening (DuckDB sandboxing, SQL validation, secrets handling)
 - Basic load testing and performance benchmarking
@@ -1024,14 +1002,17 @@ Deliverables:
 | SQL editor | CodeMirror 6 | Best-in-class code editor, DuckDB mode available |
 | Data tables | TanStack Table (Svelte) | Feature-rich, framework-agnostic |
 | Styling | Tailwind CSS | Rapid, consistent styling |
-| Backend framework | FastAPI (Python) | Async, auto-generated OpenAPI docs, great ecosystem |
+| Backend framework | FastAPI (Python 3.13) | Async, auto-generated OpenAPI docs, great ecosystem |
 | Analytical engine | DuckDB (Python bindings) | Embeddable, fast OLAP, excellent SQL dialect, native JSON/CSV/Parquet support |
-| Metadata store | PostgreSQL 16 | Production-grade from day one, JSONB support, robust concurrent access |
-| DB driver | asyncpg + SQLAlchemy (async) | High-performance async Postgres access |
+| Metadata store | SQLite | Embedded, zero-config, single-file database — ideal for self-hosted single-user tool |
+| DB access | SQLAlchemy (sync) | Sync engine with SQLite; simple and reliable |
 | Migrations | Alembic | Reliable schema evolution |
+| Package manager | uv (astral.sh) | Fast Python package and project manager |
+| Formatter | ruff | Fast Python linter and formatter |
+| Type checker | ty (astral.sh) | Fast Python type checker |
 | HTTP client | httpx | Async Python HTTP client for API source connectors |
-| LLM client | anthropic / openai / ollama SDKs | Pluggable, defaulting to Claude |
-| Containerization | Docker | Single-container deployment, easy to scale later |
+| LLM client | anthropic SDK | Claude API for LLM-assisted SQL generation |
+| Containerization | Docker Compose | Dev environment with hot-reload |
 
 ---
 
@@ -1039,7 +1020,7 @@ Deliverables:
 
 These are explicitly deferred from v1 but should inform architectural decisions:
 
-1. **Multi-user and authentication.** The data model includes no `user_id` currently. When adding multi-user support, add `user_id` to `pipelines` and `run_history`, and introduce an auth middleware. The Postgres schema is designed to make this straightforward (add column + foreign key, no storage engine change).
+1. **Multi-user and authentication.** The data model includes no `user_id` currently. When adding multi-user support, add `user_id` to `pipelines` and `run_history`, and introduce an auth middleware. At that point, consider migrating from SQLite to PostgreSQL for concurrent multi-user access.
 
 2. **Scheduled execution.** Adding cron-like scheduling is a thin layer on top of the existing API execution. A separate scheduler service (or even a systemd timer / cron job) can call `POST /api/pipelines/{id}/run` on a schedule.
 

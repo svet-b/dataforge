@@ -7,10 +7,11 @@ Implement the core DuckDB-based pipeline execution engine. This is the computati
 ## Prerequisites
 
 Stage 1 is complete. The project has:
-- Docker environment with Postgres
-- FastAPI app with async SQLAlchemy
+- Docker dev environment with SQLite
+- FastAPI app with sync SQLAlchemy
 - All database models and Pydantic schemas
 - Health check endpoint
+- Python 3.13, uv, ruff, ty toolchain
 
 **Read the existing code first** to understand naming conventions, import patterns, and project structure before adding new files.
 
@@ -369,7 +370,7 @@ class PipelineExecutor:
 
 ```python
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/pipelines", tags=["execution"])
 
@@ -377,15 +378,15 @@ router = APIRouter(prefix="/api/pipelines", tags=["execution"])
 async def run_pipeline(
     pipeline_id: UUID,
     body: RunRequest,  # {"parameters": {...}}
-    db: AsyncSession = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Execute a pipeline with the given parameters.
 
-    1. Load pipeline, nodes, edges from Postgres
+    1. Load pipeline, nodes, edges from SQLite (sync)
     2. Merge supplied parameters with pipeline defaults
-    3. Execute via PipelineExecutor
-    4. Store run in run_history
+    3. Execute via PipelineExecutor (connectors use async httpx)
+    4. Store run in run_history (sync)
     5. Prune old runs (keep last N)
     6. Return result
     """
@@ -396,7 +397,7 @@ async def preview_node(
     pipeline_id: UUID,
     node_id: UUID,
     body: RunRequest,
-    db: AsyncSession = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Execute pipeline up to and including the specified node.
@@ -537,14 +538,14 @@ app.include_router(execution.router)
 - [ ] `pytest tests/test_dag.py` — all DAG tests pass (sort, cycles, ancestors, validation)
 - [ ] `pytest tests/test_executor.py` — pipeline execution works end-to-end with CSV source
 - [ ] `pytest tests/test_connectors.py` — file connector loads CSVs correctly, API connector interpolation works
-- [ ] `POST /api/pipelines/{id}/run` executes a real pipeline stored in Postgres and returns JSON results
+- [ ] `POST /api/pipelines/{id}/run` executes a real pipeline stored in SQLite and returns JSON results
 - [ ] `POST /api/pipelines/{id}/preview/{node_id}` returns partial results for a specific node
 - [ ] Bad SQL in a transform node returns a clear error with node name, SQL, and DuckDB error message
 - [ ] DuckDB sessions are properly cleaned up (no memory leaks from unclosed connections)
 
 ## What NOT to Build
 
-- No CRUD endpoints for creating/editing pipelines via API (Stage 3) — for testing, insert data directly into Postgres or use the executor with in-memory data
+- No CRUD endpoints for creating/editing pipelines via API (Stage 3) — for testing, insert data directly into SQLite or use the executor with in-memory data
 - No frontend (Stages 4–5)
 - No LLM integration (Stage 6)
 - No Parquet caching for API sources (defer to Stage 3 or a later polish pass)

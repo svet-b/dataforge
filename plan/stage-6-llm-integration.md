@@ -2,7 +2,7 @@
 
 ## Objective
 
-Add LLM-assisted SQL generation to DataForge. Users can describe a transformation in natural language, and the system generates DuckDB SQL via an LLM (defaulting to Claude). The backend exposes a pluggable LLM provider system, and the frontend adds a chat panel to the transform node configuration.
+Add LLM-assisted SQL generation to DataForge. Users can describe a transformation in natural language, and the system generates DuckDB SQL via Claude (Anthropic API). The frontend adds a chat panel to the transform node configuration.
 
 ## Prerequisites
 
@@ -12,28 +12,9 @@ Stages 1–5 are complete. The full backend and frontend work end-to-end.
 
 ## Deliverables
 
-### 1. LLM Provider System (Backend)
+### 1. Claude LLM Provider (Backend)
 
-#### Base Protocol (`app/llm/base.py`)
-
-```python
-from typing import Protocol
-
-class LLMProvider(Protocol):
-    async def generate(self, system_prompt: str, user_prompt: str) -> str:
-        """Send a prompt to the LLM and return the text response."""
-        ...
-
-    async def generate_with_history(
-        self,
-        system_prompt: str,
-        messages: list[dict[str, str]]
-    ) -> str:
-        """Send a multi-turn conversation to the LLM and return the latest response."""
-        ...
-```
-
-#### Claude Provider (`app/llm/claude_provider.py`)
+#### Provider (`app/llm/claude_provider.py`)
 
 ```python
 import anthropic
@@ -44,94 +25,38 @@ class ClaudeProvider:
         self.model = model
 
     async def generate(self, system_prompt: str, user_prompt: str) -> str:
+        """Send a prompt to Claude and return the text response."""
         response = await self.client.messages.create(
             model=self.model,
             max_tokens=4096,
             system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}]
+            messages=[{"role": "user", "content": user_prompt}],
         )
         return response.content[0].text
 
-    async def generate_with_history(self, system_prompt: str, messages: list[dict]) -> str:
+    async def generate_with_history(
+        self,
+        system_prompt: str,
+        messages: list[dict[str, str]],
+    ) -> str:
+        """Send a multi-turn conversation to Claude and return the latest response."""
         response = await self.client.messages.create(
             model=self.model,
             max_tokens=4096,
             system=system_prompt,
-            messages=messages
+            messages=messages,
         )
         return response.content[0].text
-```
-
-#### OpenAI Provider (`app/llm/openai_provider.py`)
-
-For OpenAI-compatible APIs (including Azure OpenAI, local vLLM, etc.):
-
-```python
-from openai import AsyncOpenAI
-
-class OpenAIProvider:
-    def __init__(self, api_key: str, model: str = "gpt-4o", base_url: str | None = None):
-        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
-        self.model = model
-
-    async def generate(self, system_prompt: str, user_prompt: str) -> str:
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
-        )
-        return response.choices[0].message.content
-    ...
-```
-
-#### Ollama Provider (`app/llm/ollama_provider.py`)
-
-For local models via Ollama:
-
-```python
-import httpx
-
-class OllamaProvider:
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3"):
-        self.base_url = base_url
-        self.model = model
-
-    async def generate(self, system_prompt: str, user_prompt: str) -> str:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/api/chat",
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "stream": False
-                },
-                timeout=120.0
-            )
-            return response.json()["message"]["content"]
-    ...
 ```
 
 #### Provider Factory (`app/llm/__init__.py`)
 
 ```python
-def create_llm_provider(settings) -> LLMProvider:
-    match settings.llm_provider:
-        case "claude":
-            return ClaudeProvider(api_key=settings.anthropic_api_key, model=settings.llm_model)
-        case "openai":
-            return OpenAIProvider(api_key=settings.openai_api_key, model=settings.llm_model)
-        case "ollama":
-            return OllamaProvider(base_url=settings.ollama_base_url, model=settings.llm_model)
-        case _:
-            raise ValueError(f"Unknown LLM provider: {settings.llm_provider}")
+def create_llm_provider(settings) -> ClaudeProvider:
+    if not settings.anthropic_api_key:
+        raise ValueError("ANTHROPIC_API_KEY is required for LLM integration")
+    return ClaudeProvider(api_key=settings.anthropic_api_key, model=settings.llm_model)
 ```
-
-Add any needed settings fields to config.py: `openai_api_key`, `ollama_base_url`.
 
 ### 2. SQL Generation System Prompt (`app/llm/prompts.py`)
 
@@ -322,9 +247,9 @@ async def llm_status():
         response = await llm_provider.generate(
             "You are a test assistant.", "Reply with just 'ok'."
         )
-        return {"status": "ok", "provider": settings.llm_provider, "model": settings.llm_model}
+        return {"status": "ok", "provider": "claude", "model": settings.llm_model}
     except Exception as e:
-        return {"status": "error", "provider": settings.llm_provider, "error": str(e)}
+        return {"status": "error", "provider": "claude", "error": str(e)}
 ```
 
 Register the router in `main.py`:
@@ -438,48 +363,36 @@ Add a small indicator in the toolbar or settings area showing LLM status:
 
 ### 7. Configuration Updates
 
-Add to `config.py`:
+The LLM settings should already be in `config.py` from Stage 1:
 
 ```python
 # LLM settings
-llm_provider: str = "claude"
 llm_model: str = "claude-sonnet-4-5-20250929"
 anthropic_api_key: str = ""
-openai_api_key: str = ""
-ollama_base_url: str = "http://localhost:11434"
 ```
 
-Add to `docker-compose.yml` app environment:
+Verify the `docker-compose.yml` backend environment includes:
 
 ```yaml
 ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
-LLM_PROVIDER: "${LLM_PROVIDER:-claude}"
 LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-5-20250929}"
 ```
 
-Update `.env.example`:
+The `.env.example` should already include:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
-# Or for OpenAI:
-# LLM_PROVIDER=openai
-# OPENAI_API_KEY=sk-...
-# Or for Ollama:
-# LLM_PROVIDER=ollama
-# OLLAMA_BASE_URL=http://localhost:11434
-# LLM_MODEL=llama3
 ```
 
 ### 8. Backend Dependencies
 
-Add to `pyproject.toml`:
+Add to `pyproject.toml` using uv:
 
-```toml
-"anthropic>=0.40",
-"openai>=1.50",
+```bash
+uv add "anthropic>=0.40"
 ```
 
-Ollama uses `httpx` which is already a dependency.
+This is the only new dependency needed. The `httpx` dependency is already installed from Stage 1.
 
 ### 9. Tests
 
@@ -536,7 +449,6 @@ Use dependency injection or monkeypatching to mock the LLM provider in tests, so
 - [ ] Frontend: conversation history allows refinement ("also add a filter for...")
 - [ ] Frontend: LLM unavailability shows a clear message (not a crash)
 - [ ] `GET /api/llm/status` reports the configured provider and reachability
-- [ ] The provider is pluggable — changing `LLM_PROVIDER` env var switches between Claude/OpenAI/Ollama
 - [ ] All existing tests still pass
 - [ ] Backend tests for prompt building and response parsing pass (mocked, no real API key needed)
 
@@ -546,10 +458,10 @@ With Stage 6 done, DataForge is feature-complete for v1:
 - Visual pipeline designer with DAG editor
 - Four node types: API source, file source, SQL transform, output
 - DuckDB-based execution engine with parameter injection
-- LLM-assisted SQL authoring with iterative refinement
+- Claude-powered SQL authoring with iterative refinement
 - Data preview at each pipeline step
 - Pipeline execution via API
 - Run history with error diagnostics
-- Docker deployment with Postgres
+- Docker dev environment with SQLite
 
 The platform is ready for end-to-end testing and initial use.

@@ -9,9 +9,9 @@ Create the SvelteKit frontend with a visual DAG editor. At the end of this stage
 Stages 1–3 are complete. The backend is fully functional with:
 - Pipeline/Node/Edge/File CRUD endpoints
 - Pipeline execution endpoints
-- Postgres database
+- SQLite database (sync SQLAlchemy)
 
-**The backend must be running** during frontend development so you can test against it. Start it with `docker-compose up postgres app`.
+**The backend must be running** during frontend development so you can test against it. Start it with `docker compose up backend`.
 
 ## Tech Stack
 

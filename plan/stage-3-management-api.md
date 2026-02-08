@@ -7,7 +7,7 @@ Implement the full CRUD API for pipelines, nodes, edges, and uploaded files. Thi
 ## Prerequisites
 
 Stages 1–2 are complete. The project has:
-- Docker/Postgres/FastAPI scaffold
+- Docker dev environment with SQLite + sync SQLAlchemy
 - Database models and schemas
 - Pipeline execution engine (DuckDB, DAG resolver, connectors)
 - Execution endpoints (`/run`, `/preview`)
@@ -219,14 +219,14 @@ import re
 
 TABLE_NAME_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
-async def validate_table_name(name: str, pipeline_id: UUID, exclude_node_id: UUID | None, db: AsyncSession) -> str | None:
+def validate_table_name(name: str, pipeline_id: UUID, exclude_node_id: UUID | None, db: Session) -> str | None:
     """Returns error message if invalid, None if valid."""
     if not TABLE_NAME_PATTERN.match(name):
         return f"Invalid table name '{name}'. Must be a valid SQL identifier."
     # Check uniqueness within pipeline (excluding the current node for updates)
     ...
 
-async def validate_no_cycles(pipeline_id: UUID, new_source: UUID, new_target: UUID, db: AsyncSession) -> str | None:
+def validate_no_cycles(pipeline_id: UUID, new_source: UUID, new_target: UUID, db: Session) -> str | None:
     """Returns error message if adding this edge would create a cycle."""
     # Load all nodes and edges, add the new edge, run topological sort
     ...
