@@ -12,6 +12,7 @@
 		onClose: () => void;
 	} = $props();
 
+	// svelte-ignore state_referenced_locally
 	let rows = $state<PipelineParameter[]>(
 		parameters.length > 0
 			? parameters.map((p) => ({ ...p }))

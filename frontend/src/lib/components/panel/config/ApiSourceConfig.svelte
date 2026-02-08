@@ -16,14 +16,19 @@
 		outputTableName: string;
 	} = $props();
 
+	// svelte-ignore state_referenced_locally
 	let url = $state((config.url as string) ?? '');
+	// svelte-ignore state_referenced_locally
 	let method = $state((config.method as string) ?? 'GET');
+	// svelte-ignore state_referenced_locally
 	let headers = $state<{ key: string; value: string }[]>(
 		Array.isArray(config.headers)
 			? (config.headers as { key: string; value: string }[])
 			: []
 	);
+	// svelte-ignore state_referenced_locally
 	let body = $state((config.body as string) ?? '');
+	// svelte-ignore state_referenced_locally
 	let responsePath = $state((config.response_path as string) ?? '');
 	let tableName = $state(outputTableName);
 

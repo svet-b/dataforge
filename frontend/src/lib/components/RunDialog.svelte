@@ -16,6 +16,7 @@
 		onRunComplete: () => void;
 	} = $props();
 
+	// svelte-ignore state_referenced_locally
 	let values = $state<Record<string, string>>(
 		Object.fromEntries(parameters.map((p) => [p.name, (p.default as string) ?? '']))
 	);
@@ -72,7 +73,7 @@
 			<div class="mb-4 space-y-3">
 				{#each parameters as param}
 					<div>
-						<label class="mb-1 block text-sm font-medium text-gray-700">
+						<label for="run-param-{param.name}" class="mb-1 block text-sm font-medium text-gray-700">
 							{param.name}
 							{#if param.description}
 								<span class="ml-1 font-normal text-gray-400">- {param.description}</span>
@@ -80,6 +81,7 @@
 						</label>
 						{#if param.type === 'boolean'}
 							<select
+								id="run-param-{param.name}"
 								class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
 								bind:value={values[param.name]}
 							>
@@ -88,6 +90,7 @@
 							</select>
 						{:else}
 							<input
+								id="run-param-{param.name}"
 								class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
 								type={param.type === 'number' ? 'number' : 'text'}
 								bind:value={values[param.name]}

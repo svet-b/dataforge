@@ -12,6 +12,10 @@
 	let newDescription = $state('');
 	let confirmDeleteId = $state<string | null>(null);
 
+	function autoFocus(node: HTMLElement) {
+		node.focus();
+	}
+
 	onMount(loadPipelines);
 
 	async function loadPipelines() {
@@ -129,8 +133,8 @@
 						class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
 						bind:value={newName}
 						placeholder="My Pipeline"
-						onkeydown={(e) => e.key === 'Enter' && createPipeline()}
-						autofocus
+					onkeydown={(e) => e.key === 'Enter' && createPipeline()}
+					use:autoFocus
 					/>
 				</div>
 				<div>

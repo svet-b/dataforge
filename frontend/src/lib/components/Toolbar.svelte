@@ -16,6 +16,10 @@
 	let editing = $state(false);
 	let editValue = $state('');
 
+	function autoFocus(node: HTMLElement) {
+		node.focus();
+	}
+
 	function startEdit() {
 		editValue = pipelineName;
 		editing = true;
@@ -49,7 +53,7 @@
 				bind:value={editValue}
 				{onkeydown}
 				onblur={saveName}
-				autofocus
+				use:autoFocus
 			/>
 		{:else}
 			<button
