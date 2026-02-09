@@ -1,31 +1,25 @@
 import { writable } from 'svelte/store';
-import type { Node, Edge } from '@xyflow/svelte';
 import { api, ApiError } from '$lib/api/client.js';
-import type { PipelineDetail, PipelineParameter, NodeType, NodeUpdate } from '$lib/types/index.js';
-import {
-	backendNodeToFlowNode,
-	backendEdgeToFlowEdge,
-	flowNodeToPositionUpdate,
-	type FlowNodeData
-} from '$lib/utils/mappers.js';
+import type {
+	PipelineDetail,
+	PipelineParameter,
+	SourceResponse,
+	SourceType
+} from '$lib/types/index.js';
 import { addToast } from './toasts.js';
 
 interface PipelineState {
 	pipeline: PipelineDetail | null;
-	nodes: Node<FlowNodeData>[];
-	edges: Edge[];
 	loading: boolean;
 	error: string | null;
-	selectedNodeId: string | null;
+	selectedSourceId: string | null;
 }
 
 const initial: PipelineState = {
 	pipeline: null,
-	nodes: [],
-	edges: [],
 	loading: false,
 	error: null,
-	selectedNodeId: null
+	selectedSourceId: null,
 };
 
 export const pipelineStore = writable<PipelineState>(initial);
@@ -40,94 +34,92 @@ export async function loadPipeline(id: string) {
 	pipelineStore.update((s) => ({ ...s, loading: true, error: null }));
 	try {
 		const pipeline = await api.pipelines.get(id);
-		const nodes = pipeline.nodes.map(backendNodeToFlowNode);
-		const edges = pipeline.edges.map(backendEdgeToFlowEdge);
-		pipelineStore.set({ pipeline, nodes, edges, loading: false, error: null, selectedNodeId: null });
+		pipelineStore.set({
+			pipeline,
+			loading: false,
+			error: null,
+			selectedSourceId: null,
+		});
 	} catch (e) {
 		pipelineStore.update((s) => ({ ...s, loading: false, error: errorMsg(e) }));
 	}
 }
 
-let nodeCounter = 0;
-
-export async function addNodeAction(
+export async function addSource(
 	pipelineId: string,
-	type: NodeType,
-	positionX: number,
-	positionY: number
-): Promise<Node<FlowNodeData> | null> {
-	nodeCounter++;
-	const prefix = type.replace('source_', '');
-	const name = `${prefix}_${nodeCounter}`;
-	const outputTableName = `${prefix}_${nodeCounter}`;
+	type: SourceType,
+	tableName: string
+): Promise<SourceResponse | null> {
 	try {
-		const node = await api.nodes.create(pipelineId, {
+		const source = await api.sources.create(pipelineId, {
 			type,
-			name,
-			position_x: positionX,
-			position_y: positionY,
+			table_name: tableName,
 			config: {},
-			output_table_name: outputTableName
 		});
-		const flowNode = backendNodeToFlowNode(node);
-		pipelineStore.update((s) => ({ ...s, nodes: [...s.nodes, flowNode] }));
-		return flowNode;
+		pipelineStore.update((s) => {
+			if (!s.pipeline) return s;
+			return {
+				...s,
+				pipeline: {
+					...s.pipeline,
+					sources: [...s.pipeline.sources, source],
+				},
+				selectedSourceId: source.id,
+			};
+		});
+		return source;
 	} catch (e) {
 		addToast(errorMsg(e), 'error');
 		return null;
 	}
 }
 
-export async function updateNodePosition(pipelineId: string, node: Node) {
-	try {
-		await api.nodes.update(pipelineId, node.id, flowNodeToPositionUpdate(node));
-	} catch (e) {
-		addToast(`Failed to save position: ${errorMsg(e)}`, 'error');
-	}
-}
-
-export async function deleteNodeAction(pipelineId: string, nodeId: string) {
-	try {
-		await api.nodes.delete(pipelineId, nodeId);
-		pipelineStore.update((s) => ({
-			...s,
-			nodes: s.nodes.filter((n) => n.id !== nodeId),
-			edges: s.edges.filter((e) => e.source !== nodeId && e.target !== nodeId)
-		}));
-	} catch (e) {
-		addToast(errorMsg(e), 'error');
-	}
-}
-
-export async function addEdgeAction(
+export async function updateSource(
 	pipelineId: string,
 	sourceId: string,
-	targetId: string
-): Promise<Edge | null> {
+	data: { table_name?: string; config?: Record<string, unknown> }
+) {
 	try {
-		const edge = await api.edges.create(pipelineId, {
-			source_node_id: sourceId,
-			target_node_id: targetId
+		const updated = await api.sources.update(pipelineId, sourceId, data);
+		pipelineStore.update((s) => {
+			if (!s.pipeline) return s;
+			return {
+				...s,
+				pipeline: {
+					...s.pipeline,
+					sources: s.pipeline.sources.map((src) =>
+						src.id === sourceId ? updated : src
+					),
+				},
+			};
 		});
-		const flowEdge = backendEdgeToFlowEdge(edge);
-		pipelineStore.update((s) => ({ ...s, edges: [...s.edges, flowEdge] }));
-		return flowEdge;
 	} catch (e) {
 		addToast(errorMsg(e), 'error');
-		return null;
 	}
 }
 
-export async function deleteEdgeAction(pipelineId: string, edgeId: string) {
+export async function deleteSource(pipelineId: string, sourceId: string) {
 	try {
-		await api.edges.delete(pipelineId, edgeId);
-		pipelineStore.update((s) => ({
-			...s,
-			edges: s.edges.filter((e) => e.id !== edgeId)
-		}));
+		await api.sources.delete(pipelineId, sourceId);
+		pipelineStore.update((s) => {
+			if (!s.pipeline) return s;
+			return {
+				...s,
+				pipeline: {
+					...s.pipeline,
+					sources: s.pipeline.sources.filter((src) => src.id !== sourceId),
+				},
+				selectedSourceId:
+					s.selectedSourceId === sourceId ? null : s.selectedSourceId,
+			};
+		});
 	} catch (e) {
 		addToast(errorMsg(e), 'error');
 	}
+}
+
+export function selectSource(sourceId: string | null) {
+	pipelineStore.update((s) => ({ ...s, selectedSourceId: sourceId }));
 }
 
 export async function updatePipelineName(pipelineId: string, name: string) {
@@ -143,18 +135,13 @@ export async function updatePipelineName(pipelineId: string, name: string) {
 	}
 }
 
-export function selectNode(nodeId: string | null) {
-	pipelineStore.update((s) => ({ ...s, selectedNodeId: nodeId }));
-}
-
-export async function updateNodeConfig(pipelineId: string, nodeId: string, data: NodeUpdate) {
+export async function updatePipelineQuery(pipelineId: string, query: string) {
 	try {
-		const updated = await api.nodes.update(pipelineId, nodeId, data);
-		const flowNode = backendNodeToFlowNode(updated);
-		pipelineStore.update((s) => ({
-			...s,
-			nodes: s.nodes.map((n) => (n.id === nodeId ? { ...n, data: flowNode.data } : n))
-		}));
+		await api.pipelines.update(pipelineId, { query });
+		pipelineStore.update((s) => {
+			if (!s.pipeline) return s;
+			return { ...s, pipeline: { ...s.pipeline, query } };
+		});
 	} catch (e) {
 		addToast(errorMsg(e), 'error');
 	}
@@ -170,7 +157,7 @@ export async function updatePipelineParams(
 			if (!s.pipeline) return s;
 			return {
 				...s,
-				pipeline: { ...s.pipeline, parameters: updated.parameters ?? [] }
+				pipeline: { ...s.pipeline, parameters: updated.parameters ?? [] },
 			};
 		});
 		addToast('Parameters saved', 'success');
@@ -191,7 +178,8 @@ export async function runPipeline(
 				'success'
 			);
 		} else {
-			addToast(`Run failed: ${result.error?.message ?? 'Unknown error'}`, 'error');
+			const errorDetail = result.error as Record<string, unknown> | null;
+			addToast(`Run failed: ${errorDetail?.message ?? 'Unknown error'}`, 'error');
 		}
 		return result;
 	} catch (e) {
@@ -201,6 +189,5 @@ export async function runPipeline(
 }
 
 export function resetPipelineStore() {
-	nodeCounter = 0;
 	pipelineStore.set(initial);
 }

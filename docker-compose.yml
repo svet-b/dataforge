@@ -11,7 +11,7 @@ services:
     volumes:
       - ./backend:/app/backend
       - appdata:/data
-    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:

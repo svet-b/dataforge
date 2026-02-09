@@ -8,10 +8,12 @@
 	let {
 		value = $bindable(''),
 		onRunPreview,
+		onchange,
 		placeholder = 'SELECT * FROM ...'
 	}: {
 		value: string;
 		onRunPreview?: () => void;
+		onchange?: (value: string) => void;
 		placeholder?: string;
 	} = $props();
 
@@ -43,6 +45,7 @@
 					EditorView.updateListener.of((update) => {
 						if (update.docChanged && !suppressUpdate) {
 							value = update.state.doc.toString();
+							onchange?.(value);
 						}
 					}),
 					EditorView.theme({

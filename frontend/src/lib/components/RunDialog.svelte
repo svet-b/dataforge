@@ -2,13 +2,12 @@
 	import type { PipelineParameter } from '$lib/types/index.js';
 	import { runPipeline } from '$lib/stores/pipeline.js';
 	import { loadRuns } from '$lib/stores/runs.js';
-	import { setNodeStatus, clearNodeStatuses } from '$lib/stores/nodeStatus.js';
 
 	let {
 		pipelineId,
 		parameters,
 		onClose,
-		onRunComplete
+		onRunComplete,
 	}: {
 		pipelineId: string;
 		parameters: PipelineParameter[];
@@ -24,7 +23,6 @@
 
 	async function handleRun() {
 		running = true;
-		clearNodeStatuses();
 		const params: Record<string, unknown> = {};
 		for (const p of parameters) {
 			const val = values[p.name];
@@ -33,20 +31,7 @@
 			else params[p.name] = val;
 		}
 		try {
-			const result = await runPipeline(pipelineId, params);
-			if (result) {
-				const timings = result.node_timings ?? {};
-				for (const nodeId of Object.keys(timings)) {
-					setNodeStatus(
-						nodeId,
-						result.status === 'success' ? 'success' : 'error'
-					);
-				}
-				if (result.status !== 'success' && result.error) {
-					const failedNode = (result.error as Record<string, unknown>).node_id as string | undefined;
-					if (failedNode) setNodeStatus(failedNode, 'error');
-				}
-			}
+			await runPipeline(pipelineId, params);
 			await loadRuns(pipelineId);
 			onRunComplete();
 			onClose();

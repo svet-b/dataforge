@@ -99,7 +99,7 @@
 								<p class="mt-1 text-sm text-gray-500 line-clamp-2">{pipeline.description}</p>
 							{/if}
 							<div class="mt-3 flex items-center gap-3 text-xs text-gray-400">
-								<span>{pipeline.node_count} nodes</span>
+								<span>{pipeline.source_count} sources</span>
 								<span>Updated {formatDate(pipeline.updated_at)}</span>
 							</div>
 						</a>
@@ -172,7 +172,7 @@
 	<div class="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
 		<div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl" data-testid="delete-confirm-modal">
 			<h2 class="text-lg font-semibold text-gray-900">Delete Pipeline?</h2>
-			<p class="mt-2 text-sm text-gray-500">This action cannot be undone. All nodes and edges will be permanently deleted.</p>
+			<p class="mt-2 text-sm text-gray-500">This action cannot be undone. All sources and data will be permanently deleted.</p>
 			<div class="mt-5 flex justify-end gap-2">
 				<button
 					class="rounded px-4 py-2 text-sm text-gray-600 hover:text-gray-800"

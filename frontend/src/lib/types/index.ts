@@ -9,8 +9,7 @@ export interface PipelineSummary {
 	id: string;
 	name: string;
 	description: string | null;
-	parameter_count: number;
-	node_count: number;
+	source_count: number;
 	created_at: string;
 	updated_at: string;
 }
@@ -19,32 +18,22 @@ export interface PipelineResponse {
 	id: string;
 	name: string;
 	description: string | null;
+	query: string | null;
 	parameters: PipelineParameter[];
 	created_at: string;
 	updated_at: string;
 }
 
-export interface NodeResponse {
+export interface SourceResponse {
 	id: string;
 	pipeline_id: string;
-	type: string;
-	name: string;
-	position_x: number;
-	position_y: number;
+	table_name: string;
+	type: 'file' | 'api';
 	config: Record<string, unknown>;
-	output_table_name: string;
-}
-
-export interface EdgeResponse {
-	id: string;
-	pipeline_id: string;
-	source_node_id: string;
-	target_node_id: string;
 }
 
 export interface PipelineDetail extends PipelineResponse {
-	nodes: NodeResponse[];
-	edges: EdgeResponse[];
+	sources: SourceResponse[];
 }
 
 export interface PipelineCreate {
@@ -56,31 +45,21 @@ export interface PipelineCreate {
 export interface PipelineUpdate {
 	name?: string | null;
 	description?: string | null;
+	query?: string | null;
 	parameters?: PipelineParameter[] | null;
 }
 
-export type NodeType = 'source_api' | 'source_file' | 'transform' | 'output';
+export type SourceType = 'file' | 'api';
 
-export interface NodeCreate {
-	type: NodeType;
-	name: string;
-	position_x: number;
-	position_y: number;
+export interface SourceCreate {
+	table_name: string;
+	type: SourceType;
 	config: Record<string, unknown>;
-	output_table_name: string;
 }
 
-export interface NodeUpdate {
-	name?: string | null;
-	position_x?: number | null;
-	position_y?: number | null;
+export interface SourceUpdate {
+	table_name?: string | null;
 	config?: Record<string, unknown> | null;
-	output_table_name?: string | null;
-}
-
-export interface EdgeCreate {
-	source_node_id: string;
-	target_node_id: string;
 }
 
 export interface RunRequest {
@@ -94,7 +73,6 @@ export interface RunResponse {
 	row_count: number | null;
 	data: Record<string, unknown>[] | null;
 	error: Record<string, unknown> | null;
-	node_timings: Record<string, unknown>;
 }
 
 export interface SchemaColumn {
@@ -102,7 +80,7 @@ export interface SchemaColumn {
 	type: string;
 }
 
-export interface NodePreviewResponse extends RunResponse {
+export interface PreviewResponse extends RunResponse {
 	schema_info: SchemaColumn[];
 }
 
@@ -128,7 +106,4 @@ export interface RunHistorySummary {
 export interface RunHistoryDetail extends RunHistorySummary {
 	completed_at: string | null;
 	output_preview: Record<string, unknown>[] | null;
-	node_timings: Record<string, number>;
 }
-
-export type NodeStatus = 'idle' | 'running' | 'success' | 'error' | 'stale';

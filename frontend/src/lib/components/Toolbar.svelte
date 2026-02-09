@@ -5,7 +5,7 @@
 		pipelineId,
 		pipelineName,
 		onOpenParams,
-		onOpenRun
+		onOpenRun,
 	}: {
 		pipelineId: string;
 		pipelineName: string;

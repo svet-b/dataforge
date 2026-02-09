@@ -21,20 +21,15 @@ export interface PipelineResult {
 	id: string;
 	name: string;
 	description: string | null;
+	query: string | null;
 }
 
-export interface NodeResult {
+export interface SourceResult {
 	id: string;
 	pipeline_id: string;
+	table_name: string;
 	type: string;
-	name: string;
-	output_table_name: string;
-}
-
-export interface EdgeResult {
-	id: string;
-	source_node_id: string;
-	target_node_id: string;
+	config: Record<string, unknown>;
 }
 
 export async function createPipeline(
@@ -55,34 +50,22 @@ export async function deleteAllPipelines(): Promise<void> {
 	}
 }
 
-export async function createNode(
+export async function addSource(
 	pipelineId: string,
 	type: string,
-	name: string,
-	opts?: {
-		config?: Record<string, unknown>;
-		outputTableName?: string;
-		positionX?: number;
-		positionY?: number;
-	}
-): Promise<NodeResult> {
-	return request<NodeResult>('POST', `/pipelines/${pipelineId}/nodes`, {
+	tableName: string,
+	config?: Record<string, unknown>
+): Promise<SourceResult> {
+	return request<SourceResult>('POST', `/pipelines/${pipelineId}/sources`, {
 		type,
-		name,
-		position_x: opts?.positionX ?? 100,
-		position_y: opts?.positionY ?? 100,
-		config: opts?.config ?? {},
-		output_table_name: opts?.outputTableName ?? name.toLowerCase().replace(/\s+/g, '_'),
+		table_name: tableName,
+		config: config ?? {},
 	});
 }
 
-export async function createEdge(
+export async function updatePipeline(
 	pipelineId: string,
-	sourceNodeId: string,
-	targetNodeId: string
-): Promise<EdgeResult> {
-	return request<EdgeResult>('POST', `/pipelines/${pipelineId}/edges`, {
-		source_node_id: sourceNodeId,
-		target_node_id: targetNodeId,
-	});
+	data: { name?: string; query?: string }
+): Promise<PipelineResult> {
+	return request<PipelineResult>('PUT', `/pipelines/${pipelineId}`, data);
 }

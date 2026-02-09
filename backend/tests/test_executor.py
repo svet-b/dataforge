@@ -15,42 +15,22 @@ def executor() -> PipelineExecutor:
 
 @pytest.mark.asyncio
 async def test_simple_pipeline_execution(executor: PipelineExecutor) -> None:
-    """CSV source -> transform (aggregate) -> output."""
+    """CSV source -> aggregate query."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
-    nodes = [
+    sources = [
         {
             "id": "1",
-            "type": "source_file",
-            "name": "Load Data",
+            "type": "file",
+            "table_name": "raw_data",
             "config": {"file_path": csv_path, "file_type": "csv"},
-            "output_table_name": "raw_data",
-        },
-        {
-            "id": "2",
-            "type": "transform",
-            "name": "Aggregate",
-            "config": {
-                "sql": "SELECT meter_id, SUM(energy_kwh) AS total FROM raw_data GROUP BY meter_id"
-            },
-            "output_table_name": "aggregated",
-        },
-        {
-            "id": "3",
-            "type": "output",
-            "name": "Output",
-            "config": {"source_table": "aggregated"},
-            "output_table_name": "aggregated",
         },
     ]
-    edges = [
-        {"source_node_id": "1", "target_node_id": "2"},
-        {"source_node_id": "2", "target_node_id": "3"},
-    ]
+    query = "SELECT meter_id, SUM(energy_kwh) AS total FROM raw_data GROUP BY meter_id"
 
     result = await executor.execute(
         pipeline_id="test-pipe",
-        nodes=nodes,
-        edges=edges,
+        sources=sources,
+        query=query,
         parameters={},
     )
 
@@ -67,40 +47,20 @@ async def test_simple_pipeline_execution(executor: PipelineExecutor) -> None:
 async def test_pipeline_with_parameters(executor: PipelineExecutor) -> None:
     """Verify DuckDB variables are accessible in SQL via getvariable()."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
-    nodes = [
+    sources = [
         {
             "id": "1",
-            "type": "source_file",
-            "name": "Load Data",
+            "type": "file",
+            "table_name": "raw_data",
             "config": {"file_path": csv_path, "file_type": "csv"},
-            "output_table_name": "raw_data",
-        },
-        {
-            "id": "2",
-            "type": "transform",
-            "name": "Filter",
-            "config": {
-                "sql": "SELECT * FROM raw_data WHERE meter_id = getvariable('target_meter')"
-            },
-            "output_table_name": "filtered",
-        },
-        {
-            "id": "3",
-            "type": "output",
-            "name": "Output",
-            "config": {"source_table": "filtered"},
-            "output_table_name": "filtered",
         },
     ]
-    edges = [
-        {"source_node_id": "1", "target_node_id": "2"},
-        {"source_node_id": "2", "target_node_id": "3"},
-    ]
+    query = "SELECT * FROM raw_data WHERE meter_id = getvariable('target_meter')"
 
     result = await executor.execute(
         pipeline_id="test-pipe",
-        nodes=nodes,
-        edges=edges,
+        sources=sources,
+        query=query,
         parameters={"target_meter": "M-001"},
     )
 
@@ -112,103 +72,127 @@ async def test_pipeline_with_parameters(executor: PipelineExecutor) -> None:
 
 @pytest.mark.asyncio
 async def test_transform_error_handling(executor: PipelineExecutor) -> None:
-    """Verify that bad SQL produces a clear error with node context."""
+    """Verify that bad SQL produces a clear error."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
-    nodes = [
+    sources = [
         {
             "id": "1",
-            "type": "source_file",
-            "name": "Load Data",
+            "type": "file",
+            "table_name": "raw_data",
             "config": {"file_path": csv_path, "file_type": "csv"},
-            "output_table_name": "raw_data",
-        },
-        {
-            "id": "2",
-            "type": "transform",
-            "name": "Bad Transform",
-            "config": {"sql": "SELECT nonexistent_column FROM raw_data"},
-            "output_table_name": "bad_result",
-        },
-        {
-            "id": "3",
-            "type": "output",
-            "name": "Output",
-            "config": {"source_table": "bad_result"},
-            "output_table_name": "bad_result",
         },
     ]
-    edges = [
-        {"source_node_id": "1", "target_node_id": "2"},
-        {"source_node_id": "2", "target_node_id": "3"},
-    ]
+    query = "SELECT nonexistent_column FROM raw_data"
 
     result = await executor.execute(
         pipeline_id="test-pipe",
-        nodes=nodes,
-        edges=edges,
+        sources=sources,
+        query=query,
         parameters={},
     )
 
     assert result.status == "failed"
     assert result.error is not None
-    assert result.error["node_name"] == "Bad Transform"
-    assert result.error["sql"] == "SELECT nonexistent_column FROM raw_data"
     assert "nonexistent_column" in result.error["message"].lower()
 
 
 @pytest.mark.asyncio
-async def test_preview_partial_execution(executor: PipelineExecutor) -> None:
-    """Verify that preview only executes the subgraph up to the target node."""
+async def test_multiple_sources_with_join(executor: PipelineExecutor) -> None:
+    """Verify that multiple sources can be joined in a single query."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
-    nodes = [
+    sources = [
         {
             "id": "1",
-            "type": "source_file",
-            "name": "Load Data",
+            "type": "file",
+            "table_name": "readings",
             "config": {"file_path": csv_path, "file_type": "csv"},
-            "output_table_name": "raw_data",
         },
         {
             "id": "2",
-            "type": "transform",
-            "name": "Aggregate",
-            "config": {
-                "sql": "SELECT meter_id, SUM(energy_kwh) AS total FROM raw_data GROUP BY meter_id"
-            },
-            "output_table_name": "aggregated",
-        },
-        {
-            "id": "3",
-            "type": "transform",
-            "name": "Further Transform",
-            "config": {"sql": "SELECT * FROM aggregated WHERE total > 40"},
-            "output_table_name": "filtered",
-        },
-        {
-            "id": "4",
-            "type": "output",
-            "name": "Output",
-            "config": {"source_table": "filtered"},
-            "output_table_name": "filtered",
+            "type": "file",
+            "table_name": "readings_copy",
+            "config": {"file_path": csv_path, "file_type": "csv"},
         },
     ]
-    edges = [
-        {"source_node_id": "1", "target_node_id": "2"},
-        {"source_node_id": "2", "target_node_id": "3"},
-        {"source_node_id": "3", "target_node_id": "4"},
-    ]
+    query = (
+        "SELECT r.meter_id, r.energy_kwh, c.energy_kwh as copy_kwh "
+        "FROM readings r "
+        "JOIN readings_copy c ON r.meter_id = c.meter_id "
+        "AND r.reading_timestamp = c.reading_timestamp"
+    )
 
-    # Preview at node 2 (the aggregate) - should not execute node 3/4
     result = await executor.execute(
         pipeline_id="test-pipe",
-        nodes=nodes,
-        edges=edges,
+        sources=sources,
+        query=query,
         parameters={},
-        target_node_id="2",
     )
 
     assert result.status == "success"
-    assert result.row_count == 2  # Both meters
-    # Node 3 and 4 should not appear in timings
-    assert "3" not in result.node_timings
-    assert "4" not in result.node_timings
+    assert result.row_count == 6
+    assert result.data is not None
+
+
+@pytest.mark.asyncio
+async def test_preview_with_limit(executor: PipelineExecutor) -> None:
+    """Verify that preview_limit constrains returned rows."""
+    csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
+    sources = [
+        {
+            "id": "1",
+            "type": "file",
+            "table_name": "raw_data",
+            "config": {"file_path": csv_path, "file_type": "csv"},
+        },
+    ]
+    query = "SELECT * FROM raw_data"
+
+    result = await executor.execute(
+        pipeline_id="test-pipe",
+        sources=sources,
+        query=query,
+        parameters={},
+        preview_limit=2,
+    )
+
+    assert result.status == "success"
+    assert result.row_count == 6  # total count
+    assert result.data is not None
+    assert len(result.data) == 2  # but only 2 returned
+    assert len(result.schema_info) > 0
+
+
+@pytest.mark.asyncio
+async def test_cte_query(executor: PipelineExecutor) -> None:
+    """Verify that CTEs work for multi-step transformations."""
+    csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
+    sources = [
+        {
+            "id": "1",
+            "type": "file",
+            "table_name": "raw_data",
+            "config": {"file_path": csv_path, "file_type": "csv"},
+        },
+    ]
+    query = """
+        WITH totals AS (
+            SELECT meter_id, SUM(energy_kwh) AS total
+            FROM raw_data
+            GROUP BY meter_id
+        )
+        SELECT meter_id, total
+        FROM totals
+        WHERE total > 40
+    """
+
+    result = await executor.execute(
+        pipeline_id="test-pipe",
+        sources=sources,
+        query=query,
+        parameters={},
+    )
+
+    assert result.status == "success"
+    assert result.row_count == 1
+    assert result.data is not None
+    assert result.data[0]["meter_id"] == "M-002"

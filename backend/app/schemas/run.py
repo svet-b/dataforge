@@ -27,4 +27,3 @@ class RunHistoryResponse(BaseModel):
     row_count: int | None
     output_preview: dict[str, Any] | None
     error: dict[str, Any] | None
-    node_timings: dict[str, Any] | None

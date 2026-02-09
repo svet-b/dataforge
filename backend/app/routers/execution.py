@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import csv
+import io
+import json
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -14,13 +18,9 @@ from app.engine.executor import PipelineExecutor
 from app.models.pipeline import Pipeline
 from app.models.run import RunHistory
 from app.models.uploaded_file import UploadedFile
-from app.schemas.execution import NodePreviewResponse, RunRequest, RunResponse
+from app.schemas.execution import PreviewResponse, RunRequest, RunResponse
 
 router = APIRouter(prefix="/api/pipelines", tags=["execution"])
-
-
-_NodeList = list[dict[str, Any]]
-_EdgeList = list[dict[str, Any]]
 
 
 def _json_safe(obj: Any) -> Any:
@@ -36,7 +36,10 @@ def _json_safe(obj: Any) -> Any:
     return obj
 
 
-def _load_pipeline(pipeline_id: str, db: Session) -> tuple[Pipeline, _NodeList, _EdgeList]:
+def _load_pipeline(
+    pipeline_id: str, db: Session
+) -> tuple[Pipeline, list[dict[str, Any]], str | None]:
+    """Load pipeline, its sources (with file paths resolved), and its query."""
     pipeline = db.get(Pipeline, pipeline_id)
     if not pipeline:
         raise HTTPException(status_code=404, detail="Pipeline not found")
@@ -49,31 +52,23 @@ def _load_pipeline(pipeline_id: str, db: Session) -> tuple[Pipeline, _NodeList, 
     )
     file_path_map = {uf.filename: uf.storage_path for uf in uploaded_files}
 
-    nodes = []
-    for n in pipeline.nodes:
-        config = dict(n.config)
-        # Resolve filename to file_path for source_file nodes
-        if n.type == "source_file" and "filename" in config and "file_path" not in config:
+    sources = []
+    for s in pipeline.sources:
+        config = dict(s.config)
+        # Resolve filename to file_path for file sources
+        if s.type == "file" and "filename" in config and "file_path" not in config:
             filename = config["filename"]
             if filename in file_path_map:
                 config["file_path"] = file_path_map[filename]
-        nodes.append(
+        sources.append(
             {
-                "id": n.id,
-                "type": n.type,
-                "name": n.name,
+                "id": s.id,
+                "type": s.type,
+                "table_name": s.table_name,
                 "config": config,
-                "output_table_name": n.output_table_name,
             }
         )
-    edges = [
-        {
-            "source_node_id": e.source_node_id,
-            "target_node_id": e.target_node_id,
-        }
-        for e in pipeline.edges
-    ]
-    return pipeline, nodes, edges
+    return pipeline, sources, pipeline.query
 
 
 def _merge_parameters(pipeline: Pipeline, supplied: dict[str, Any]) -> dict[str, Any]:
@@ -98,17 +93,18 @@ async def run_pipeline(
     body: RunRequest,
     db: Session = Depends(get_db),
 ) -> RunResponse:
-    pipeline, nodes, edges = _load_pipeline(pipeline_id, db)
+    pipeline, sources, query = _load_pipeline(pipeline_id, db)
+    if not query or not query.strip():
+        raise HTTPException(status_code=400, detail="Pipeline has no query defined")
     parameters = _merge_parameters(pipeline, body.parameters)
 
     executor = PipelineExecutor(settings)
-    result = executor.execute(
+    exec_result = await executor.execute(
         pipeline_id=pipeline_id,
-        nodes=nodes,
-        edges=edges,
+        sources=sources,
+        query=query,
         parameters=parameters,
     )
-    exec_result = await result
 
     # Store run in run_history
     run_id = str(uuid.uuid4())
@@ -124,7 +120,6 @@ async def run_pipeline(
         row_count=exec_result.row_count,
         output_preview=_json_safe({"data": exec_result.data[:50]}) if exec_result.data else None,
         error=exec_result.error,
-        node_timings=exec_result.node_timings,
     )
     db.add(run)
     db.commit()
@@ -146,50 +141,80 @@ async def run_pipeline(
         status=exec_result.status,
         duration_ms=exec_result.duration_ms,
         row_count=exec_result.row_count,
-        data=exec_result.data,
+        data=_json_safe(exec_result.data) if exec_result.data else None,
         error=exec_result.error,
-        node_timings=exec_result.node_timings,
     )
 
 
-@router.post("/{pipeline_id}/preview/{node_id}")
-async def preview_node(
+@router.post("/{pipeline_id}/preview")
+async def preview_pipeline(
     pipeline_id: str,
-    node_id: str,
     body: RunRequest,
     db: Session = Depends(get_db),
-) -> NodePreviewResponse:
-    pipeline, nodes, edges = _load_pipeline(pipeline_id, db)
+) -> PreviewResponse:
+    pipeline, sources, query = _load_pipeline(pipeline_id, db)
+    if not query or not query.strip():
+        raise HTTPException(status_code=400, detail="Pipeline has no query defined")
     parameters = _merge_parameters(pipeline, body.parameters)
-
-    # Verify node exists
-    node_ids = {n["id"] for n in nodes}
-    if node_id not in node_ids:
-        raise HTTPException(status_code=404, detail="Node not found")
 
     executor = PipelineExecutor(settings)
     exec_result = await executor.execute(
         pipeline_id=pipeline_id,
-        nodes=nodes,
-        edges=edges,
+        sources=sources,
+        query=query,
         parameters=parameters,
-        target_node_id=node_id,
+        preview_limit=50,
     )
 
-    # Get schema info from a fresh session if successful
     schema_info: list[dict[str, str]] = []
-    if exec_result.status == "success" and exec_result.data:
-        # Infer schema from the data keys
-        if exec_result.data:
-            schema_info = [{"name": k, "type": "VARCHAR"} for k in exec_result.data[0].keys()]
+    if exec_result.status == "success" and exec_result.schema_info:
+        schema_info = exec_result.schema_info
 
-    return NodePreviewResponse(
+    return PreviewResponse(
         run_id=uuid.uuid4(),
         status=exec_result.status,
         duration_ms=exec_result.duration_ms,
         row_count=exec_result.row_count,
-        data=exec_result.data,
+        data=_json_safe(exec_result.data) if exec_result.data else None,
         error=exec_result.error,
-        node_timings=exec_result.node_timings,
         schema_info=schema_info,
     )
+
+
+@router.get("/{pipeline_id}/runs/{run_id}/download")
+def download_run(
+    pipeline_id: str,
+    run_id: str,
+    format: str = Query(default="csv", pattern="^(csv|json)$"),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    pipeline = db.get(Pipeline, pipeline_id)
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+    run = db.get(RunHistory, run_id)
+    if not run or run.pipeline_id != pipeline_id:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if run.status != "success" or not run.output_preview:
+        raise HTTPException(status_code=400, detail="Run has no output data")
+
+    data = run.output_preview.get("data", [])
+    if not data:
+        raise HTTPException(status_code=400, detail="Run has no output data")
+
+    if format == "json":
+        content = json.dumps(data, indent=2, default=str)
+        return StreamingResponse(
+            io.BytesIO(content.encode()),
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename=run_{run_id}.json"},
+        )
+    else:
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=list(data[0].keys()))
+        writer.writeheader()
+        writer.writerows(data)
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode()),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=run_{run_id}.csv"},
+        )

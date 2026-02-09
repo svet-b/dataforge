@@ -10,9 +10,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
-    from app.models.edge import Edge
-    from app.models.node import Node
     from app.models.run import RunHistory
+    from app.models.source import Source
     from app.models.uploaded_file import UploadedFile
 
 
@@ -22,6 +21,7 @@ class Pipeline(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    query: Mapped[str | None] = mapped_column(Text, nullable=True)
     parameters: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[str] = mapped_column(
         String, nullable=False, default=lambda: datetime.now(UTC).isoformat()
@@ -30,11 +30,8 @@ class Pipeline(Base):
         String, nullable=False, default=lambda: datetime.now(UTC).isoformat()
     )
 
-    nodes: Mapped[list[Node]] = relationship(
-        "Node", back_populates="pipeline", cascade="all, delete-orphan"
-    )
-    edges: Mapped[list[Edge]] = relationship(
-        "Edge", back_populates="pipeline", cascade="all, delete-orphan"
+    sources: Mapped[list[Source]] = relationship(
+        "Source", back_populates="pipeline", cascade="all, delete-orphan"
     )
     uploaded_files: Mapped[list[UploadedFile]] = relationship(
         "UploadedFile", back_populates="pipeline", cascade="all, delete-orphan"

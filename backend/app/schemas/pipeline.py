@@ -3,8 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.schemas.edge import EdgeResponse
-from app.schemas.node import NodeResponse
+from app.schemas.source import SourceResponse
 
 
 class PipelineParameter(BaseModel):
@@ -23,6 +22,7 @@ class PipelineCreate(BaseModel):
 class PipelineUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
+    query: str | None = None
     parameters: list[PipelineParameter] | None = None
 
 
@@ -30,6 +30,7 @@ class PipelineResponse(BaseModel):
     id: UUID
     name: str
     description: str | None
+    query: str | None
     parameters: list[PipelineParameter]
     created_at: datetime
     updated_at: datetime
@@ -39,12 +40,10 @@ class PipelineSummaryResponse(BaseModel):
     id: UUID
     name: str
     description: str | None
-    parameter_count: int
-    node_count: int
+    source_count: int
     created_at: datetime
     updated_at: datetime
 
 
 class PipelineDetailResponse(PipelineResponse):
-    nodes: list[NodeResponse]
-    edges: list[EdgeResponse]
+    sources: list[SourceResponse]

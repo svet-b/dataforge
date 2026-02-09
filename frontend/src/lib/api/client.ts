@@ -4,14 +4,12 @@ import type {
 	PipelineDetail,
 	PipelineCreate,
 	PipelineUpdate,
-	NodeResponse,
-	NodeCreate,
-	NodeUpdate,
-	EdgeResponse,
-	EdgeCreate,
+	SourceResponse,
+	SourceCreate,
+	SourceUpdate,
 	RunRequest,
 	RunResponse,
-	NodePreviewResponse,
+	PreviewResponse,
 	UploadedFileResponse,
 	RunHistorySummary,
 	RunHistoryDetail
@@ -75,33 +73,23 @@ export const api = {
 			request<PipelineResponse>('PUT', `/api/pipelines/${id}`, data),
 		delete: (id: string) => request<void>('DELETE', `/api/pipelines/${id}`)
 	},
-	nodes: {
-		create: (pipelineId: string, data: NodeCreate) =>
-			request<NodeResponse>('POST', `/api/pipelines/${pipelineId}/nodes`, data),
-		update: (pipelineId: string, nodeId: string, data: NodeUpdate) =>
-			request<NodeResponse>(
+	sources: {
+		create: (pipelineId: string, data: SourceCreate) =>
+			request<SourceResponse>('POST', `/api/pipelines/${pipelineId}/sources`, data),
+		update: (pipelineId: string, sourceId: string, data: SourceUpdate) =>
+			request<SourceResponse>(
 				'PUT',
-				`/api/pipelines/${pipelineId}/nodes/${nodeId}`,
+				`/api/pipelines/${pipelineId}/sources/${sourceId}`,
 				data
 			),
-		delete: (pipelineId: string, nodeId: string) =>
-			request<void>('DELETE', `/api/pipelines/${pipelineId}/nodes/${nodeId}`)
-	},
-	edges: {
-		create: (pipelineId: string, data: EdgeCreate) =>
-			request<EdgeResponse>('POST', `/api/pipelines/${pipelineId}/edges`, data),
-		delete: (pipelineId: string, edgeId: string) =>
-			request<void>('DELETE', `/api/pipelines/${pipelineId}/edges/${edgeId}`)
+		delete: (pipelineId: string, sourceId: string) =>
+			request<void>('DELETE', `/api/pipelines/${pipelineId}/sources/${sourceId}`)
 	},
 	execution: {
 		run: (pipelineId: string, data: RunRequest = {}) =>
 			request<RunResponse>('POST', `/api/pipelines/${pipelineId}/run`, data),
-		preview: (pipelineId: string, nodeId: string, data: RunRequest = {}) =>
-			request<NodePreviewResponse>(
-				'POST',
-				`/api/pipelines/${pipelineId}/preview/${nodeId}`,
-				data
-			)
+		preview: (pipelineId: string, data: RunRequest = {}) =>
+			request<PreviewResponse>('POST', `/api/pipelines/${pipelineId}/preview`, data)
 	},
 	files: {
 		upload: (pipelineId: string, file: File) => {
@@ -126,5 +114,9 @@ export const api = {
 			),
 		get: (pipelineId: string, runId: string) =>
 			request<RunHistoryDetail>('GET', `/api/pipelines/${pipelineId}/runs/${runId}`)
+	},
+	download: {
+		url: (pipelineId: string, runId: string, format: 'csv' | 'json') =>
+			`/api/pipelines/${pipelineId}/runs/${runId}/download?format=${format}`
 	}
 };

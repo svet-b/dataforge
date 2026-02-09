@@ -1,5 +1,5 @@
 import { test, expect } from './helpers/fixtures.js';
-import { createPipeline, createNode } from './helpers/api.js';
+import { createPipeline, addSource } from './helpers/api.js';
 
 test.describe('Pipeline editor', () => {
 	let pipelineId: string;
@@ -9,59 +9,45 @@ test.describe('Pipeline editor', () => {
 		pipelineId = pipeline.id;
 	});
 
-	test('loads editor with toolbar and canvas', async ({ page }) => {
+	test('loads editor with toolbar and panels', async ({ page }) => {
 		await page.goto(`/pipelines/${pipelineId}`);
 
 		await expect(page.getByTestId('toolbar')).toBeVisible();
 		await expect(page.getByTestId('pipeline-name')).toHaveText('Editor Test');
-		await expect(page.getByTestId('dag-canvas')).toBeVisible();
-		await expect(page.getByTestId('add-node-transform')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Run' })).toBeVisible();
+		await expect(page.getByTestId('source-list')).toBeVisible();
+		await expect(page.getByTestId('query-editor')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Parameters' })).toBeVisible();
 	});
 
-	test('adds a node via palette', async ({ page }) => {
+	test('adds a file source via Add button', async ({ page }) => {
 		await page.goto(`/pipelines/${pipelineId}`);
-		await expect(page.getByTestId('dag-canvas')).toBeVisible();
+		await expect(page.getByTestId('source-list')).toBeVisible();
 
-		await page.getByTestId('add-node-transform').click();
-		await expect(page.locator('.svelte-flow__node')).toBeVisible();
+		await page.getByTestId('add-source-btn').click();
+		await page.getByTestId('add-file-source').click();
+
+		await expect(page.getByTestId('source-item')).toBeVisible();
 	});
 
-	test('adds multiple nodes', async ({ page }) => {
+	test('adds an API source via Add button', async ({ page }) => {
 		await page.goto(`/pipelines/${pipelineId}`);
-		await expect(page.getByTestId('dag-canvas')).toBeVisible();
 
-		await page.getByTestId('add-node-source_file').click();
-		await page.getByTestId('add-node-transform').click();
-		await page.getByTestId('add-node-output').click();
+		await page.getByTestId('add-source-btn').click();
+		await page.getByTestId('add-api-source').click();
 
-		await expect(page.locator('.svelte-flow__node')).toHaveCount(3);
+		await expect(page.getByTestId('source-item')).toBeVisible();
 	});
 
-	test('clicking node opens bottom panel', async ({ page }) => {
-		await createNode(pipelineId, 'transform', 'My Transform');
+	test('clicking source opens config panel', async ({ page }) => {
+		await addSource(pipelineId, 'file', 'my_data');
 		await page.goto(`/pipelines/${pipelineId}`);
 
-		const node = page.locator('.svelte-flow__node');
-		await expect(node).toBeVisible();
-		await node.click();
+		const sourceItem = page.getByTestId('source-item');
+		await expect(sourceItem).toBeVisible();
+		await sourceItem.click();
 
-		await expect(page.getByTestId('bottom-panel')).toBeVisible();
-		await expect(page.getByTestId('tab-config')).toBeVisible();
-	});
-
-	test('clicking pane closes panel config', async ({ page }) => {
-		await createNode(pipelineId, 'transform', 'My Transform');
-		await page.goto(`/pipelines/${pipelineId}`);
-
-		const node = page.locator('.svelte-flow__node');
-		await expect(node).toBeVisible();
-		await node.click();
-		await expect(page.getByTestId('bottom-panel')).toBeVisible();
-
-		await page.locator('.svelte-flow__pane').click();
-		await expect(page.getByTestId('config-placeholder')).toBeVisible();
+		await expect(page.getByTestId('source-config')).toBeVisible();
 	});
 
 	test('renames pipeline', async ({ page }) => {

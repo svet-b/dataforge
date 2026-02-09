@@ -15,8 +15,7 @@ class RunResponse(BaseModel):
     row_count: int | None
     data: list[dict[str, Any]] | None
     error: dict[str, Any] | None
-    node_timings: dict[str, Any]
 
 
-class NodePreviewResponse(RunResponse):
+class PreviewResponse(RunResponse):
     schema_info: list[dict[str, str]]
