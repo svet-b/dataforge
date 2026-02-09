@@ -2,19 +2,23 @@
 	let {
 		entries = $bindable<{ key: string; value: string }[]>([]),
 		keyPlaceholder = 'Key',
-		valuePlaceholder = 'Value'
+		valuePlaceholder = 'Value',
+		onchange,
 	}: {
 		entries: { key: string; value: string }[];
 		keyPlaceholder?: string;
 		valuePlaceholder?: string;
+		onchange?: () => void;
 	} = $props();
 
 	function addEntry() {
 		entries = [...entries, { key: '', value: '' }];
+		onchange?.();
 	}
 
 	function removeEntry(index: number) {
 		entries = entries.filter((_, i) => i !== index);
+		onchange?.();
 	}
 </script>
 
@@ -25,11 +29,13 @@
 				class="flex-1 rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
 				placeholder={keyPlaceholder}
 				bind:value={entry.key}
+				oninput={() => onchange?.()}
 			/>
 			<input
 				class="flex-1 rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
 				placeholder={valuePlaceholder}
 				bind:value={entry.value}
+				oninput={() => onchange?.()}
 			/>
 			<button
 				class="text-gray-400 hover:text-red-500"

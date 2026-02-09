@@ -35,7 +35,7 @@
 	}
 </script>
 
-<div class="flex h-full flex-col" data-testid="source-list">
+<div class="flex flex-col" data-testid="source-list">
 	<div class="flex items-center justify-between border-b border-gray-200 px-3 py-2">
 		<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Inputs</h3>
 		<div class="relative">
@@ -67,7 +67,7 @@
 		</div>
 	</div>
 
-	<div class="flex-1 overflow-y-auto">
+	<div class="overflow-y-auto">
 		{#if sources.length === 0}
 			<div class="px-3 py-6 text-center text-xs text-gray-400">
 				No input sources yet.<br />Click + Add to get started.

@@ -148,7 +148,7 @@
 			<!-- File source config -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
-				class="rounded-lg border-2 border-dashed p-3 text-center transition-colors {dragOver
+				class="relative rounded-lg border-2 border-dashed p-3 text-center transition-colors {dragOver
 					? 'border-green-400 bg-green-50'
 					: 'border-gray-300 hover:border-gray-400'}"
 				ondrop={onDrop}
@@ -168,7 +168,6 @@
 					class="absolute inset-0 cursor-pointer opacity-0"
 					onchange={onFileInput}
 					accept=".csv,.tsv,.json,.xlsx,.xls,.parquet"
-					style="position: relative;"
 				/>
 			</div>
 
@@ -214,7 +213,7 @@
 
 			<div>
 				<label class="mb-1 block text-xs font-medium text-gray-600">Headers</label>
-				<KeyValueEditor bind:entries={headers} keyPlaceholder="Header name" valuePlaceholder="Header value" />
+				<KeyValueEditor bind:entries={headers} keyPlaceholder="Header name" valuePlaceholder="Header value" onchange={onchange} />
 			</div>
 
 			{#if method === 'POST'}
