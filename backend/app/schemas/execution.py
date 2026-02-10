@@ -16,3 +16,18 @@ class RunResponse(BaseModel):
     data: list[dict[str, Any]] | None
     schema_info: list[dict[str, str]]
     error: dict[str, Any] | None
+
+
+class CTEResultResponse(BaseModel):
+    name: str
+    ordinal: int
+    row_count: int
+    data: list[dict[str, Any]]
+    schema_info: list[dict[str, str]]
+
+
+class CTEInspectionResponse(BaseModel):
+    status: str
+    duration_ms: int
+    ctes: list[CTEResultResponse]
+    error: dict[str, Any] | None

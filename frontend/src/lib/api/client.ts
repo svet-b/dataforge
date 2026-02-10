@@ -15,7 +15,8 @@ import type {
 	TableSchema,
 	GenerateSQLRequest,
 	GenerateSQLResponse,
-	LlmStatus
+	LlmStatus,
+	CTEInspectionResponse
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -90,7 +91,13 @@ export const api = {
 	},
 	execution: {
 		run: (pipelineId: string, data: RunRequest = {}) =>
-			request<RunResponse>('POST', `/api/pipelines/${pipelineId}/run`, data)
+			request<RunResponse>('POST', `/api/pipelines/${pipelineId}/run`, data),
+		inspectCtes: (pipelineId: string, data: RunRequest = {}) =>
+			request<CTEInspectionResponse>(
+				'POST',
+				`/api/pipelines/${pipelineId}/inspect-ctes`,
+				data
+			)
 	},
 	files: {
 		upload: (pipelineId: string, file: File) => {

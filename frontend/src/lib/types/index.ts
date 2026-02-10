@@ -136,3 +136,20 @@ export interface LlmStatus {
 	model?: string;
 	error?: string;
 }
+
+// CTE Inspection types
+
+export interface CTEResult {
+	name: string;
+	ordinal: number;
+	row_count: number;
+	data: Record<string, unknown>[];
+	schema_info: SchemaColumn[];
+}
+
+export interface CTEInspectionResponse {
+	status: string;
+	duration_ms: number;
+	ctes: CTEResult[];
+	error: ExecutionError | null;
+}

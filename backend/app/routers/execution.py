@@ -18,7 +18,7 @@ from app.engine.executor import PipelineExecutor
 from app.models.pipeline import Pipeline
 from app.models.run import RunHistory
 from app.models.uploaded_file import UploadedFile
-from app.schemas.execution import RunRequest, RunResponse
+from app.schemas.execution import CTEInspectionResponse, RunRequest, RunResponse
 
 router = APIRouter(prefix="/api/pipelines", tags=["execution"])
 
@@ -148,6 +148,43 @@ async def run_pipeline(
         data=_json_safe(exec_result.data[:100]) if exec_result.data else None,
         schema_info=schema_info,
         error=exec_result.error,
+    )
+
+
+@router.post("/{pipeline_id}/inspect-ctes")
+async def inspect_ctes(
+    pipeline_id: str,
+    body: RunRequest,
+    db: Session = Depends(get_db),
+) -> CTEInspectionResponse:
+    """Inspect intermediate CTE results without creating a run history entry."""
+    pipeline, sources, query = _load_pipeline(pipeline_id, db)
+    if not query or not query.strip():
+        raise HTTPException(status_code=400, detail="Pipeline has no query defined")
+    parameters = _merge_parameters(pipeline, body.parameters)
+
+    executor = PipelineExecutor(settings)
+    result = await executor.inspect_ctes(
+        pipeline_id=pipeline_id,
+        sources=sources,
+        query=query,
+        parameters=parameters,
+    )
+
+    return CTEInspectionResponse(
+        status=result.status,
+        duration_ms=result.duration_ms,
+        ctes=[
+            {
+                "name": c.name,
+                "ordinal": c.ordinal,
+                "row_count": c.row_count,
+                "data": _json_safe(c.data),
+                "schema_info": c.schema_info,
+            }
+            for c in result.ctes
+        ],
+        error=result.error,
     )
 
 
