@@ -16,7 +16,8 @@ import type {
 	GenerateSQLRequest,
 	GenerateSQLResponse,
 	LlmStatus,
-	CTEInspectionResponse
+	CTEInspectionResponse,
+	SourcePreviewResponse
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -97,6 +98,11 @@ export const api = {
 				'POST',
 				`/api/pipelines/${pipelineId}/inspect-ctes`,
 				data
+			),
+		previewSources: (pipelineId: string) =>
+			request<SourcePreviewResponse>(
+				'POST',
+				`/api/pipelines/${pipelineId}/preview-sources`
 			)
 	},
 	files: {

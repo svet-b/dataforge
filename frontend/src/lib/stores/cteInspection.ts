@@ -8,6 +8,7 @@ interface CTEInspectionState {
 	selectedCte: string | null;
 	error: string | null;
 	durationMs: number | null;
+	cachedForRunId: string | null;
 }
 
 const initial: CTEInspectionState = {
@@ -15,13 +16,15 @@ const initial: CTEInspectionState = {
 	ctes: [],
 	selectedCte: null,
 	error: null,
-	durationMs: null
+	durationMs: null,
+	cachedForRunId: null
 };
 
 export const cteInspectionStore = writable<CTEInspectionState>(initial);
 
 export async function loadCteInspection(
 	pipelineId: string,
+	runId: string | null,
 	parameters: Record<string, unknown> = {}
 ) {
 	cteInspectionStore.set({ ...initial, loading: true });
@@ -33,7 +36,8 @@ export async function loadCteInspection(
 				ctes: result.ctes,
 				selectedCte: result.ctes.length > 0 ? result.ctes[0].name : null,
 				error: null,
-				durationMs: result.duration_ms
+				durationMs: result.duration_ms,
+				cachedForRunId: runId
 			});
 		} else {
 			cteInspectionStore.set({

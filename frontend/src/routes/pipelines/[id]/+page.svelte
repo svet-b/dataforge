@@ -15,6 +15,7 @@
 		setResultsError,
 	} from '$lib/stores/results.js';
 	import { resetCteInspection } from '$lib/stores/cteInspection.js';
+	import { resetSourcePreview } from '$lib/stores/sourcePreview.js';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import SourceList from '$lib/components/SourceList.svelte';
 	import SourceConfigPanel from '$lib/components/SourceConfigPanel.svelte';
@@ -70,6 +71,7 @@
 		resetRunsStore();
 		clearResults();
 		resetCteInspection();
+		resetSourcePreview();
 	});
 
 	function handleKeydown(e: KeyboardEvent) {

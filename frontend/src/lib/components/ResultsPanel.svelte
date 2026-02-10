@@ -6,6 +6,11 @@
 		loadCteInspection,
 		selectCte,
 	} from '$lib/stores/cteInspection.js';
+	import {
+		sourcePreviewStore,
+		loadSourcePreview,
+		selectSource,
+	} from '$lib/stores/sourcePreview.js';
 	import { api } from '$lib/api/client.js';
 
 	let {
@@ -69,20 +74,30 @@
 		return String(value);
 	}
 
+	// Source preview: selected source data
+	let selectedSourceData = $derived(
+		$sourcePreviewStore.sources.find((s) => s.name === $sourcePreviewStore.selectedSource) ?? null
+	);
+
 	// CTE inspection: selected CTE data
 	let selectedCteData = $derived(
 		$cteInspectionStore.ctes.find((c) => c.name === $cteInspectionStore.selectedCte) ?? null
 	);
 
-	let cteLoaded = false;
+	// Cache is stale when the runId has changed since last CTE fetch
+	let cteStale = $derived(
+		$resultsStore.runId !== $cteInspectionStore.cachedForRunId
+	);
 
 	$effect(() => {
 		if (activeTab === 'history') {
 			loadRuns(pipelineId);
 		}
-		if (activeTab === 'ctes' && !cteLoaded) {
-			cteLoaded = true;
-			loadCteInspection(pipelineId);
+		if (activeTab === 'inputs' && !$sourcePreviewStore.cached && !$sourcePreviewStore.loading) {
+			loadSourcePreview(pipelineId);
+		}
+		if (activeTab === 'ctes' && cteStale && !$cteInspectionStore.loading) {
+			loadCteInspection(pipelineId, $resultsStore.runId);
 		}
 	});
 </script>
@@ -90,6 +105,24 @@
 <div class="flex h-full flex-col">
 	<!-- Tab bar -->
 	<div class="flex gap-0 border-b border-gray-200 px-2">
+		<button
+			data-testid="tab-inputs"
+			class="px-3 py-1.5 text-xs font-medium transition-colors {activeTab === 'inputs'
+				? 'border-b-2 border-blue-500 text-blue-600'
+				: 'text-gray-500 hover:text-gray-700'}"
+			onclick={() => (activeTab = 'inputs')}
+		>
+			Inputs
+		</button>
+		<button
+			data-testid="tab-ctes"
+			class="px-3 py-1.5 text-xs font-medium transition-colors {activeTab === 'ctes'
+				? 'border-b-2 border-blue-500 text-blue-600'
+				: 'text-gray-500 hover:text-gray-700'}"
+			onclick={() => (activeTab = 'ctes')}
+		>
+			Intermediate CTEs
+		</button>
 		<button
 			data-testid="tab-results"
 			class="px-3 py-1.5 text-xs font-medium transition-colors {activeTab === 'results'
@@ -100,20 +133,8 @@
 			Results
 		</button>
 		<button
-			data-testid="tab-ctes"
-			class="px-3 py-1.5 text-xs font-medium transition-colors {activeTab === 'ctes'
-				? 'border-b-2 border-blue-500 text-blue-600'
-				: 'text-gray-500 hover:text-gray-700'}"
-			onclick={() => {
-				activeTab = 'ctes';
-				cteLoaded = false;
-			}}
-		>
-			Intermediate CTEs
-		</button>
-		<button
 			data-testid="tab-history"
-			class="px-3 py-1.5 text-xs font-medium transition-colors {activeTab === 'history'
+			class="ml-auto px-3 py-1.5 text-xs font-medium transition-colors {activeTab === 'history'
 				? 'border-b-2 border-blue-500 text-blue-600'
 				: 'text-gray-500 hover:text-gray-700'}"
 			onclick={() => (activeTab = 'history')}
@@ -124,7 +145,133 @@
 
 	<!-- Content -->
 	<div class="flex-1 overflow-auto">
-		{#if activeTab === 'results'}
+		{#if activeTab === 'inputs'}
+			<!-- Source Inputs -->
+			{#if $sourcePreviewStore.loading}
+				<div class="flex h-full items-center justify-center text-sm text-gray-500">
+					<svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<circle cx="12" cy="12" r="10" class="opacity-25" />
+						<path d="M4 12a8 8 0 0 1 8-8" class="opacity-75" stroke-linecap="round" />
+					</svg>
+					Loading sources...
+				</div>
+			{:else if $sourcePreviewStore.error}
+				<div class="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{$sourcePreviewStore.error}</div>
+			{:else if $sourcePreviewStore.sources.length === 0}
+				<div class="flex h-full items-center justify-center text-sm text-gray-400">
+					No sources configured.
+				</div>
+			{:else}
+				<!-- Source selector pills -->
+				<div class="sticky top-0 z-20 flex items-center gap-1.5 border-b border-gray-200 bg-white px-3 py-1.5">
+					{#each $sourcePreviewStore.sources as src}
+						<button
+							class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors {$sourcePreviewStore.selectedSource === src.name
+								? 'bg-blue-100 text-blue-700'
+								: 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+							onclick={() => selectSource(src.name)}
+						>
+							{src.name}
+							<span class="ml-1 text-gray-400">{src.row_count}</span>
+						</button>
+					{/each}
+					{#if $sourcePreviewStore.durationMs != null}
+						<span class="ml-auto text-xs text-gray-400">{$sourcePreviewStore.durationMs}ms</span>
+					{/if}
+				</div>
+				<!-- Source data table -->
+				{#if selectedSourceData}
+					{#if selectedSourceData.error}
+						<div class="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{selectedSourceData.error}</div>
+					{:else}
+						<table class="w-full border-collapse font-mono text-xs">
+							<thead>
+								<tr class="sticky top-[33px] z-10 bg-gray-50">
+									{#each selectedSourceData.schema_info as col}
+										<th class="border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold">
+											<span class="text-gray-800">{col.name}</span>
+											<span class="ml-1 text-gray-400">{col.type}</span>
+										</th>
+									{/each}
+								</tr>
+							</thead>
+							<tbody>
+								{#each selectedSourceData.data as row, i}
+									<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+										{#each selectedSourceData.schema_info as col}
+											<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
+												{formatCell(row[col.name])}
+											</td>
+										{/each}
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					{/if}
+				{/if}
+			{/if}
+		{:else if activeTab === 'ctes'}
+			<!-- CTE Inspection -->
+			{#if $cteInspectionStore.loading}
+				<div class="flex h-full items-center justify-center text-sm text-gray-500">
+					<svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<circle cx="12" cy="12" r="10" class="opacity-25" />
+						<path d="M4 12a8 8 0 0 1 8-8" class="opacity-75" stroke-linecap="round" />
+					</svg>
+					Inspecting CTEs...
+				</div>
+			{:else if $cteInspectionStore.error}
+				<div class="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{$cteInspectionStore.error}</div>
+			{:else if $cteInspectionStore.ctes.length === 0}
+				<div class="flex h-full items-center justify-center text-sm text-gray-400">
+					No CTEs found in the query.
+				</div>
+			{:else}
+				<!-- CTE selector pills -->
+				<div class="sticky top-0 z-20 flex items-center gap-1.5 border-b border-gray-200 bg-white px-3 py-1.5">
+					{#each $cteInspectionStore.ctes as cte}
+						<button
+							class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors {$cteInspectionStore.selectedCte === cte.name
+								? 'bg-blue-100 text-blue-700'
+								: 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+							onclick={() => selectCte(cte.name)}
+						>
+							{cte.name}
+							<span class="ml-1 text-gray-400">{cte.row_count}</span>
+						</button>
+					{/each}
+					{#if $cteInspectionStore.durationMs != null}
+						<span class="ml-auto text-xs text-gray-400">{$cteInspectionStore.durationMs}ms</span>
+					{/if}
+				</div>
+				<!-- CTE data table -->
+				{#if selectedCteData}
+					<table class="w-full border-collapse font-mono text-xs">
+						<thead>
+							<tr class="sticky top-[33px] z-10 bg-gray-50">
+								{#each selectedCteData.schema_info as col}
+									<th class="border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold">
+										<span class="text-gray-800">{col.name}</span>
+										<span class="ml-1 text-gray-400">{col.type}</span>
+									</th>
+								{/each}
+							</tr>
+						</thead>
+						<tbody>
+							{#each selectedCteData.data as row, i}
+								<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+									{#each selectedCteData.schema_info as col}
+										<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
+											{formatCell(row[col.name])}
+										</td>
+									{/each}
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/if}
+			{/if}
+		{:else if activeTab === 'results'}
 			<!-- Results table -->
 			{#if $resultsStore.loading}
 				<div class="flex h-full items-center justify-center text-sm text-gray-500">
@@ -196,67 +343,6 @@
 						{/each}
 					</tbody>
 				</table>
-			{/if}
-		{:else if activeTab === 'ctes'}
-			<!-- CTE Inspection -->
-			{#if $cteInspectionStore.loading}
-				<div class="flex h-full items-center justify-center text-sm text-gray-500">
-					<svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<circle cx="12" cy="12" r="10" class="opacity-25" />
-						<path d="M4 12a8 8 0 0 1 8-8" class="opacity-75" stroke-linecap="round" />
-					</svg>
-					Inspecting CTEs...
-				</div>
-			{:else if $cteInspectionStore.error}
-				<div class="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{$cteInspectionStore.error}</div>
-			{:else if $cteInspectionStore.ctes.length === 0}
-				<div class="flex h-full items-center justify-center text-sm text-gray-400">
-					No CTEs found in the query.
-				</div>
-			{:else}
-				<!-- CTE selector pills -->
-				<div class="sticky top-0 z-20 flex items-center gap-1.5 border-b border-gray-200 bg-white px-3 py-1.5">
-					{#each $cteInspectionStore.ctes as cte}
-						<button
-							class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors {$cteInspectionStore.selectedCte === cte.name
-								? 'bg-blue-100 text-blue-700'
-								: 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
-							onclick={() => selectCte(cte.name)}
-						>
-							{cte.name}
-							<span class="ml-1 text-gray-400">{cte.row_count}</span>
-						</button>
-					{/each}
-					{#if $cteInspectionStore.durationMs != null}
-						<span class="ml-auto text-xs text-gray-400">{$cteInspectionStore.durationMs}ms</span>
-					{/if}
-				</div>
-				<!-- CTE data table -->
-				{#if selectedCteData}
-					<table class="w-full border-collapse font-mono text-xs">
-						<thead>
-							<tr class="sticky top-[33px] z-10 bg-gray-50">
-								{#each selectedCteData.schema_info as col}
-									<th class="border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold">
-										<span class="text-gray-800">{col.name}</span>
-										<span class="ml-1 text-gray-400">{col.type}</span>
-									</th>
-								{/each}
-							</tr>
-						</thead>
-						<tbody>
-							{#each selectedCteData.data as row, i}
-								<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-									{#each selectedCteData.schema_info as col}
-										<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
-											{formatCell(row[col.name])}
-										</td>
-									{/each}
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				{/if}
 			{/if}
 		{:else if activeTab === 'history'}
 			<!-- Run History -->

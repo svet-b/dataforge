@@ -137,6 +137,22 @@ export interface LlmStatus {
 	error?: string;
 }
 
+// Source preview types
+
+export interface SourcePreviewResult {
+	name: string;
+	row_count: number;
+	data: Record<string, unknown>[];
+	schema_info: SchemaColumn[];
+	error?: string | null;
+}
+
+export interface SourcePreviewResponse {
+	status: string;
+	duration_ms: number;
+	sources: SourcePreviewResult[];
+}
+
 // CTE Inspection types
 
 export interface CTEResult {

@@ -18,7 +18,12 @@ from app.engine.executor import PipelineExecutor
 from app.models.pipeline import Pipeline
 from app.models.run import RunHistory
 from app.models.uploaded_file import UploadedFile
-from app.schemas.execution import CTEInspectionResponse, RunRequest, RunResponse
+from app.schemas.execution import (
+    CTEInspectionResponse,
+    RunRequest,
+    RunResponse,
+    SourcePreviewResponse,
+)
 
 router = APIRouter(prefix="/api/pipelines", tags=["execution"])
 
@@ -185,6 +190,60 @@ async def inspect_ctes(
             for c in result.ctes
         ],
         error=result.error,
+    )
+
+
+@router.post("/{pipeline_id}/preview-sources")
+async def preview_sources(
+    pipeline_id: str,
+    db: Session = Depends(get_db),
+) -> SourcePreviewResponse:
+    """Load each source and return schema + data preview (up to 100 rows)."""
+    _pipeline, sources, _query = _load_pipeline(pipeline_id, db)
+    if not sources:
+        return SourcePreviewResponse(status="success", duration_ms=0, sources=[])
+
+    import time
+
+    from app.engine.duckdb_manager import DuckDBSession
+
+    start_time = time.monotonic()
+    executor = PipelineExecutor(settings)
+    session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
+    results: list[dict[str, Any]] = []
+    try:
+        for source in sources:
+            table_name = source["table_name"]
+            try:
+                await executor._load_source(session, source, {})
+                schema = session.get_table_schema(table_name)
+                row_count = session.get_row_count(table_name)
+                data = session.get_table_data(table_name, limit=100)
+                results.append(
+                    {
+                        "name": table_name,
+                        "row_count": row_count,
+                        "data": _json_safe(data),
+                        "schema_info": schema,
+                    }
+                )
+            except Exception as e:
+                results.append(
+                    {
+                        "name": table_name,
+                        "row_count": 0,
+                        "data": [],
+                        "schema_info": [],
+                        "error": str(e),
+                    }
+                )
+    finally:
+        session.close()
+
+    return SourcePreviewResponse(
+        status="success",
+        duration_ms=int((time.monotonic() - start_time) * 1000),
+        sources=results,
     )
 
 

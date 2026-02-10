@@ -18,6 +18,20 @@ class RunResponse(BaseModel):
     error: dict[str, Any] | None
 
 
+class SourcePreviewResult(BaseModel):
+    name: str
+    row_count: int
+    data: list[dict[str, Any]]
+    schema_info: list[dict[str, str]]
+    error: str | None = None
+
+
+class SourcePreviewResponse(BaseModel):
+    status: str
+    duration_ms: int
+    sources: list[SourcePreviewResult]
+
+
 class CTEResultResponse(BaseModel):
     name: str
     ordinal: int
