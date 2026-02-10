@@ -27,7 +27,6 @@
 
 	let showParamModal = $state(false);
 	let showRunDialog = $state(false);
-	let showAiChat = $state(false);
 	let resultsTab = $state('results');
 
 	// Resizable bottom panel
@@ -139,16 +138,13 @@
 					bind:this={queryEditor}
 					{pipelineId}
 					onRun={handleRun}
-					bind:showAiChat
 				/>
 			</div>
 
 			<!-- Right sidebar: AI chat -->
-			{#if showAiChat}
-				<div class="flex w-80 shrink-0 flex-col border-l border-gray-200 bg-white">
-					<LlmChat {pipelineId} onSqlGenerated={handleSqlGenerated} />
-				</div>
-			{/if}
+			<div class="flex w-80 shrink-0 flex-col border-l border-gray-200 bg-white">
+				<LlmChat {pipelineId} onSqlGenerated={handleSqlGenerated} />
+			</div>
 		</div>
 
 		<!-- Bottom: results panel with resize handle -->
