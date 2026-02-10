@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { SourceResponse, PipelineParameter } from '$lib/types/index.js';
 	import { untrack } from 'svelte';
 	import { updatePipelineQuery, pipelineStore } from '$lib/stores/pipeline.js';
 	import { debounce } from '$lib/utils/debounce.js';
@@ -8,9 +7,11 @@
 	let {
 		pipelineId,
 		onRun,
+		showAiChat = $bindable(false)
 	}: {
 		pipelineId: string;
 		onRun: () => void;
+		showAiChat: boolean;
 	} = $props();
 
 	let sources = $derived($pipelineStore.pipeline?.sources ?? []);
@@ -54,15 +55,31 @@
 			sqlEditor.insertAtCursor(`getvariable('${paramName}')`);
 		}
 	}
+
+	export function setSql(sql: string) {
+		queryValue = sql;
+		saveQuery(sql);
+	}
 </script>
 
 <div class="flex h-full flex-col" data-testid="query-editor">
 	<!-- Header bar -->
 	<div class="flex items-center justify-between border-b border-gray-200 px-3 py-2">
 		<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">SQL Query</h3>
-		<span class="text-xs text-gray-400">
-			{navigator.platform.includes('Mac') ? '\u2318' : 'Ctrl'}+Enter to run
-		</span>
+		<div class="flex items-center gap-2">
+			<button
+				class="rounded px-2 py-0.5 text-xs font-medium transition-colors {showAiChat
+					? 'bg-violet-100 text-violet-700'
+					: 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}"
+				onclick={() => (showAiChat = !showAiChat)}
+				title="Toggle AI assistant"
+			>
+				AI
+			</button>
+			<span class="text-xs text-gray-400">
+				{navigator.platform.includes('Mac') ? '\u2318' : 'Ctrl'}+Enter to run
+			</span>
+		</div>
 	</div>
 
 	<!-- Reference pills: available tables and parameters -->

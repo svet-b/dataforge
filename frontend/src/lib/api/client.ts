@@ -11,7 +11,11 @@ import type {
 	RunResponse,
 	UploadedFileResponse,
 	RunHistorySummary,
-	RunHistoryDetail
+	RunHistoryDetail,
+	TableSchema,
+	GenerateSQLRequest,
+	GenerateSQLResponse,
+	LlmStatus
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -115,5 +119,14 @@ export const api = {
 	download: {
 		url: (pipelineId: string, runId: string, format: 'csv' | 'json') =>
 			`/api/pipelines/${pipelineId}/runs/${runId}/download?format=${format}`
+	},
+	describeSources: {
+		get: (pipelineId: string) =>
+			request<TableSchema[]>('POST', `/api/pipelines/${pipelineId}/describe-sources`)
+	},
+	llm: {
+		generateSql: (data: GenerateSQLRequest) =>
+			request<GenerateSQLResponse>('POST', '/api/llm/generate-sql', data),
+		status: () => request<LlmStatus>('GET', '/api/llm/status')
 	}
 };

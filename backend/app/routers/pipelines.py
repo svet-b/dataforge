@@ -217,9 +217,7 @@ def update_source(
     if not source or source.pipeline_id != pipeline_id:
         raise HTTPException(status_code=404, detail="Source not found")
     if body.table_name is not None:
-        error = _validate_table_name(
-            body.table_name, pipeline_id, db, exclude_source_id=source_id
-        )
+        error = _validate_table_name(body.table_name, pipeline_id, db, exclude_source_id=source_id)
         if error:
             status = 409 if "already exists" in error else 400
             raise HTTPException(status_code=status, detail=error)

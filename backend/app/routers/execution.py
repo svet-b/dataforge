@@ -45,11 +45,7 @@ def _load_pipeline(
         raise HTTPException(status_code=404, detail="Pipeline not found")
 
     # Build a filename → storage_path lookup for uploaded files
-    uploaded_files = (
-        db.query(UploadedFile)
-        .filter(UploadedFile.pipeline_id == pipeline_id)
-        .all()
-    )
+    uploaded_files = db.query(UploadedFile).filter(UploadedFile.pipeline_id == pipeline_id).all()
     file_path_map = {uf.filename: uf.storage_path for uf in uploaded_files}
 
     sources = []
@@ -153,6 +149,39 @@ async def run_pipeline(
         schema_info=schema_info,
         error=exec_result.error,
     )
+
+
+@router.post("/{pipeline_id}/describe-sources")
+async def describe_sources(
+    pipeline_id: str,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Load each source into a temporary DuckDB session and return schema info.
+
+    Returns: [{"name": "table_name", "columns": [{"name": "col", "type": "VARCHAR"}, ...]}]
+    """
+    pipeline, sources, _query = _load_pipeline(pipeline_id, db)
+    if not sources:
+        return []
+
+    from app.engine.duckdb_manager import DuckDBSession
+
+    executor = PipelineExecutor(settings)
+    session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
+    result: list[dict[str, Any]] = []
+    try:
+        for source in sources:
+            try:
+                await executor._load_source(session, source, {})
+                schema = session.get_table_schema(source["table_name"])
+                result.append({"name": source["table_name"], "columns": schema})
+            except Exception:
+                # If a source fails to load, skip it (e.g., missing file)
+                result.append({"name": source["table_name"], "columns": []})
+    finally:
+        session.close()
+
+    return result
 
 
 @router.get("/{pipeline_id}/runs/{run_id}/download")

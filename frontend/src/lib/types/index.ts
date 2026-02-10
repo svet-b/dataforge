@@ -110,3 +110,29 @@ export interface RunHistoryDetail extends RunHistorySummary {
 	completed_at: string | null;
 	output_preview: Record<string, unknown>[] | null;
 }
+
+// LLM types
+
+export interface TableSchema {
+	name: string;
+	columns: SchemaColumn[];
+}
+
+export interface GenerateSQLRequest {
+	prompt: string;
+	available_tables: TableSchema[];
+	pipeline_parameters: PipelineParameter[];
+	conversation_history: { role: string; content: string }[];
+}
+
+export interface GenerateSQLResponse {
+	sql: string;
+	explanation: string;
+}
+
+export interface LlmStatus {
+	status: string;
+	provider: string;
+	model?: string;
+	error?: string;
+}

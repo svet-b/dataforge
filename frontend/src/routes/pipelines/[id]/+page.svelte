@@ -21,11 +21,13 @@
 	import ResultsPanel from '$lib/components/ResultsPanel.svelte';
 	import ParameterModal from '$lib/components/ParameterModal.svelte';
 	import RunDialog from '$lib/components/RunDialog.svelte';
+	import LlmChat from '$lib/components/LlmChat.svelte';
 
 	const pipelineId = page.params.id!;
 
 	let showParamModal = $state(false);
 	let showRunDialog = $state(false);
+	let showAiChat = $state(false);
 	let resultsTab = $state('results');
 
 	// Resizable bottom panel
@@ -33,6 +35,8 @@
 	let dragging = $state(false);
 	let startY = 0;
 	let startHeight = 0;
+
+	let queryEditor: QueryEditor | undefined = $state();
 
 	function onPointerDown(e: PointerEvent) {
 		dragging = true;
@@ -93,6 +97,10 @@
 		}
 		await loadRuns(pipelineId);
 	}
+
+	function handleSqlGenerated(sql: string) {
+		queryEditor?.setSql(sql);
+	}
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -113,7 +121,7 @@
 			onRun={handleRun}
 		/>
 
-		<!-- Main content: inputs + query editor -->
+		<!-- Main content: inputs + query editor + AI chat -->
 		<div class="flex flex-1 overflow-hidden">
 			<!-- Left sidebar: source list + config -->
 			<div class="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
@@ -127,8 +135,20 @@
 
 			<!-- Center: SQL query editor -->
 			<div class="flex flex-1 flex-col overflow-hidden bg-white">
-				<QueryEditor {pipelineId} onRun={handleRun} />
+				<QueryEditor
+					bind:this={queryEditor}
+					{pipelineId}
+					onRun={handleRun}
+					bind:showAiChat
+				/>
 			</div>
+
+			<!-- Right sidebar: AI chat -->
+			{#if showAiChat}
+				<div class="flex w-80 shrink-0 flex-col border-l border-gray-200 bg-white">
+					<LlmChat {pipelineId} onSqlGenerated={handleSqlGenerated} />
+				</div>
+			{/if}
 		</div>
 
 		<!-- Bottom: results panel with resize handle -->

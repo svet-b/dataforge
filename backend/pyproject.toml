@@ -13,6 +13,7 @@ dependencies = [
     "httpx>=0.28",
     "pyyaml>=6.0",
     "python-multipart>=0.0.22",
+    "anthropic>=0.40",
 ]
 
 [dependency-groups]
