@@ -58,6 +58,12 @@
 		return api.download.url(pipelineId, runId, format);
 	}
 
+	function formatCell(value: unknown): string {
+		if (value == null) return '';
+		if (typeof value === 'object') return JSON.stringify(value);
+		return String(value);
+	}
+
 	$effect(() => {
 		if (activeTab === 'history') {
 			loadRuns(pipelineId);
@@ -137,7 +143,7 @@
 									<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
 										{#each $previewStore.schema as col}
 											<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
-												{row[col.name] ?? ''}
+												{formatCell(row[col.name])}
 											</td>
 										{/each}
 									</tr>
@@ -186,8 +192,11 @@
 							{#if expandedRunId === run.id && $runsStore.expandedRun}
 								<div class="border-t border-gray-100 bg-gray-50/50 px-4 py-3 text-xs">
 									{#if $runsStore.expandedRun.error}
-										<div class="mb-2 rounded bg-red-50 p-2 text-red-600">
-											{$runsStore.expandedRun.error}
+										<div class="mb-2 space-y-1 rounded bg-red-50 p-2 text-red-600">
+											<div>{$runsStore.expandedRun.error.message}</div>
+											{#if $runsStore.expandedRun.error.sql}
+												<pre class="mt-1 whitespace-pre-wrap rounded bg-red-100/50 p-1.5 font-mono text-red-700">{$runsStore.expandedRun.error.sql}</pre>
+											{/if}
 										</div>
 									{/if}
 

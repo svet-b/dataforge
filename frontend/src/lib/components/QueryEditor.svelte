@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SourceResponse, PipelineParameter } from '$lib/types/index.js';
+	import { untrack } from 'svelte';
 	import { updatePipelineQuery, pipelineStore } from '$lib/stores/pipeline.js';
 	import { runPreview } from '$lib/stores/preview.js';
 	import { debounce } from '$lib/utils/debounce.js';
@@ -15,10 +16,10 @@
 	let parameters = $derived($pipelineStore.pipeline?.parameters ?? []);
 	let queryValue = $state($pipelineStore.pipeline?.query ?? '');
 
-	// Sync from store when pipeline loads
+	// Sync from store when pipeline loads (untrack queryValue so typing doesn't re-trigger)
 	$effect(() => {
 		const pipelineQuery = $pipelineStore.pipeline?.query ?? '';
-		if (pipelineQuery !== queryValue) {
+		if (pipelineQuery !== untrack(() => queryValue)) {
 			queryValue = pipelineQuery;
 		}
 	});

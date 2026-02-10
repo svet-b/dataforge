@@ -136,12 +136,13 @@ export async function updatePipelineName(pipelineId: string, name: string) {
 }
 
 export async function updatePipelineQuery(pipelineId: string, query: string) {
+	// Update store optimistically so the effect doesn't race with typing
+	pipelineStore.update((s) => {
+		if (!s.pipeline) return s;
+		return { ...s, pipeline: { ...s.pipeline, query } };
+	});
 	try {
 		await api.pipelines.update(pipelineId, { query });
-		pipelineStore.update((s) => {
-			if (!s.pipeline) return s;
-			return { ...s, pipeline: { ...s.pipeline, query } };
-		});
 	} catch (e) {
 		addToast(errorMsg(e), 'error');
 	}
@@ -178,8 +179,7 @@ export async function runPipeline(
 				'success'
 			);
 		} else {
-			const errorDetail = result.error as Record<string, unknown> | null;
-			addToast(`Run failed: ${errorDetail?.message ?? 'Unknown error'}`, 'error');
+			addToast(`Run failed: ${result.error?.message ?? 'Unknown error'}`, 'error');
 		}
 		return result;
 	} catch (e) {

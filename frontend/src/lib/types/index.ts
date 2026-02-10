@@ -72,7 +72,7 @@ export interface RunResponse {
 	duration_ms: number;
 	row_count: number | null;
 	data: Record<string, unknown>[] | null;
-	error: Record<string, unknown> | null;
+	error: ExecutionError | null;
 }
 
 export interface SchemaColumn {
@@ -92,6 +92,11 @@ export interface UploadedFileResponse {
 	uploaded_at: string;
 }
 
+export interface ExecutionError {
+	message: string;
+	sql?: string | null;
+}
+
 export interface RunHistorySummary {
 	id: string;
 	pipeline_id: string;
@@ -100,7 +105,7 @@ export interface RunHistorySummary {
 	started_at: string;
 	duration_ms: number;
 	row_count: number | null;
-	error: string | null;
+	error: ExecutionError | null;
 }
 
 export interface RunHistoryDetail extends RunHistorySummary {

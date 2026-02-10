@@ -31,7 +31,7 @@ export async function runPreview(pipelineId: string) {
 			data: (result.data as Record<string, unknown>[]) ?? [],
 			schema: result.schema_info ?? [],
 			rowCount: result.row_count,
-			error: result.status === 'success' ? null : String(result.error ?? 'Unknown error'),
+			error: result.status === 'success' ? null : (result.error?.message ?? 'Unknown error'),
 			durationMs: result.duration_ms,
 		});
 	} catch (e) {
