@@ -346,6 +346,7 @@ def list_runs(
             started_at=r.started_at,
             duration_ms=r.duration_ms,
             row_count=r.row_count,
+            schema_info=r.schema_info,
             error=r.error,
         )
         for r in runs
@@ -367,6 +368,7 @@ def get_run(pipeline_id: str, run_id: str, db: Session = Depends(get_db)) -> Run
         completed_at=run.completed_at,
         duration_ms=run.duration_ms,
         row_count=run.row_count,
+        schema_info=run.schema_info,
         output_preview=run.output_preview,
         error=run.error,
     )

@@ -28,6 +28,7 @@ class RunHistory(Base):
     completed_at: Mapped[str | None] = mapped_column(String, nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     row_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    schema_info: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
     output_preview: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     error: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     node_timings: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

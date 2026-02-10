@@ -68,11 +68,11 @@ test.describe('Integration: CSV → SQL Query → Run', () => {
 		await expect(cmEditor).toContainText('SELECT product');
 
 		// ============================================================
-		// Step 3: Preview the results
+		// Step 3: Run the pipeline and verify results
 		// ============================================================
-		await page.getByTestId('preview-btn').click();
+		await page.getByRole('button', { name: 'Run', exact: true }).click();
 
-		// Should see results in the results panel
+		// Should see results in the results panel (no dialog since no params)
 		await expect(page.getByText('Showing')).toBeVisible({ timeout: 10000 });
 
 		const dataTable = page.locator('table').last();
@@ -82,26 +82,18 @@ test.describe('Integration: CSV → SQL Query → Run', () => {
 		await expect(dataTable.getByText('450')).toBeVisible();
 		await expect(dataTable.getByText('550')).toBeVisible();
 
-		// ============================================================
-		// Step 4: Run the pipeline
-		// ============================================================
-		await page.getByRole('button', { name: 'Run', exact: true }).click();
-		await expect(page.getByTestId('run-dialog')).toBeVisible();
-
-		await page.getByTestId('run-execute-btn').click();
-
-		// Wait for run to complete — dialog closes
-		await expect(page.getByTestId('run-dialog')).not.toBeVisible({ timeout: 30000 });
+		// Download buttons should be available
+		await expect(page.getByTestId('download-buttons')).toBeVisible();
 
 		// ============================================================
-		// Step 5: Verify Run History
+		// Step 4: Verify Run History
 		// ============================================================
 		await page.getByTestId('tab-history').click();
 
 		// Should see a successful run entry
 		const successDot = page.locator('.bg-green-500').first();
 		await expect(successDot).toBeVisible();
-		// Check "2 rows" in the history list (not the toast)
+		// Check "2 rows" in the history list
 		await expect(page.getByText('2 rows').first()).toBeVisible();
 	});
 });

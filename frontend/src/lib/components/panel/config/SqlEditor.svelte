@@ -38,10 +38,10 @@
 			state: EditorState.create({
 				doc: value,
 				extensions: [
+					keymap.of(keys),
 					basicSetup,
 					sql(),
 					cmPlaceholder(placeholder),
-					keymap.of(keys),
 					EditorView.updateListener.of((update) => {
 						if (update.docChanged && !suppressUpdate) {
 							value = update.state.doc.toString();

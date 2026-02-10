@@ -2,14 +2,15 @@
 	import type { SourceResponse, PipelineParameter } from '$lib/types/index.js';
 	import { untrack } from 'svelte';
 	import { updatePipelineQuery, pipelineStore } from '$lib/stores/pipeline.js';
-	import { runPreview } from '$lib/stores/preview.js';
 	import { debounce } from '$lib/utils/debounce.js';
 	import SqlEditor from '$lib/components/panel/config/SqlEditor.svelte';
 
 	let {
 		pipelineId,
+		onRun,
 	}: {
 		pipelineId: string;
+		onRun: () => void;
 	} = $props();
 
 	let sources = $derived($pipelineStore.pipeline?.sources ?? []);
@@ -35,10 +36,10 @@
 		saveQuery(newValue);
 	}
 
-	function handlePreview() {
+	function handleRun() {
 		saveQuery.cancel();
 		updatePipelineQuery(pipelineId, queryValue).then(() => {
-			runPreview(pipelineId);
+			onRun();
 		});
 	}
 
@@ -59,13 +60,9 @@
 	<!-- Header bar -->
 	<div class="flex items-center justify-between border-b border-gray-200 px-3 py-2">
 		<h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">SQL Query</h3>
-		<button
-			class="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white shadow-sm hover:bg-blue-700"
-			onclick={handlePreview}
-			data-testid="preview-btn"
-		>
-			Preview
-		</button>
+		<span class="text-xs text-gray-400">
+			{navigator.platform.includes('Mac') ? '\u2318' : 'Ctrl'}+Enter to run
+		</span>
 	</div>
 
 	<!-- Reference pills: available tables and parameters -->
@@ -97,7 +94,7 @@
 		<SqlEditor
 			bind:this={sqlEditor}
 			bind:value={queryValue}
-			onRunPreview={handlePreview}
+			onRunPreview={handleRun}
 			onchange={handleQueryChange}
 			placeholder="SELECT * FROM my_table..."
 		/>

@@ -5,12 +5,12 @@
 		pipelineId,
 		pipelineName,
 		onOpenParams,
-		onOpenRun,
+		onRun,
 	}: {
 		pipelineId: string;
 		pipelineName: string;
 		onOpenParams: () => void;
-		onOpenRun: () => void;
+		onRun: () => void;
 	} = $props();
 
 	let editing = $state(false);
@@ -75,7 +75,7 @@
 
 	<button
 		class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700"
-		onclick={onOpenRun}
+		onclick={onRun}
 	>
 		Run
 	</button>

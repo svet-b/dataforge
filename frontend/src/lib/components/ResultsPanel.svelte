@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { previewStore } from '$lib/stores/preview.js';
+	import { resultsStore } from '$lib/stores/results.js';
 	import { runsStore, loadRuns, loadRunDetail } from '$lib/stores/runs.js';
 	import { api } from '$lib/api/client.js';
 
@@ -24,7 +24,7 @@
 	}
 
 	let sortedData = $derived.by(() => {
-		const data = $previewStore.data;
+		const data = $resultsStore.data;
 		if (!sortCol || data.length === 0) return data;
 		const col = sortCol;
 		const dir = sortDir === 'asc' ? 1 : -1;
@@ -97,8 +97,8 @@
 	<!-- Content -->
 	<div class="flex-1 overflow-auto">
 		{#if activeTab === 'results'}
-			<!-- Results / Preview table -->
-			{#if $previewStore.loading}
+			<!-- Results table -->
+			{#if $resultsStore.loading}
 				<div class="flex h-full items-center justify-center text-sm text-gray-500">
 					<svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<circle cx="12" cy="12" r="10" class="opacity-25" />
@@ -106,52 +106,68 @@
 					</svg>
 					Running query...
 				</div>
-			{:else if $previewStore.error}
-				<div class="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{$previewStore.error}</div>
-			{:else if $previewStore.data.length === 0}
+			{:else if $resultsStore.error}
+				<div class="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{$resultsStore.error}</div>
+			{:else if $resultsStore.data.length === 0}
 				<div class="flex h-full items-center justify-center text-sm text-gray-400">
-					No results yet. Write a query and click Preview.
+					No results yet. Click Run to execute the pipeline.
 				</div>
 			{:else}
-				<div class="flex h-full flex-col">
-					<div class="shrink-0 border-b border-gray-200 px-3 py-1 text-xs text-gray-500">
-						Showing {sortedData.length} of {$previewStore.rowCount ?? sortedData.length} rows
-						{#if $previewStore.durationMs != null}
-							&middot; {$previewStore.durationMs}ms
+				<div class="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-3 py-1">
+					<span class="text-xs text-gray-500">
+						Showing {sortedData.length} of {$resultsStore.rowCount ?? sortedData.length} rows
+						{#if $resultsStore.durationMs != null}
+							&middot; {$resultsStore.durationMs}ms
 						{/if}
-					</div>
-					<div class="flex-1 overflow-auto">
-						<table class="w-full border-collapse font-mono text-xs">
-							<thead>
-								<tr class="sticky top-0 z-10 bg-gray-50">
-									{#each $previewStore.schema as col}
-										<th
-											class="cursor-pointer border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold hover:bg-gray-100"
-											onclick={() => toggleSort(col.name)}
-										>
-											<span class="text-gray-800">{col.name}</span>
-											<span class="ml-1 text-gray-400">{col.type}</span>
-											{#if sortCol === col.name}
-												<span class="ml-0.5">{sortDir === 'asc' ? '\u25B2' : '\u25BC'}</span>
-											{/if}
-										</th>
-									{/each}
-								</tr>
-							</thead>
-							<tbody>
-								{#each sortedData as row, i}
-									<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-										{#each $previewStore.schema as col}
-											<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
-												{formatCell(row[col.name])}
-											</td>
-										{/each}
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
+					</span>
+					{#if $resultsStore.runId}
+						<div class="flex gap-1.5" data-testid="download-buttons">
+							<a
+								href={downloadUrl($resultsStore.runId, 'csv')}
+								class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+								download
+							>
+								CSV
+							</a>
+							<a
+								href={downloadUrl($resultsStore.runId, 'json')}
+								class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+								download
+							>
+								JSON
+							</a>
+						</div>
+					{/if}
 				</div>
+				<table class="w-full border-collapse font-mono text-xs">
+					<thead>
+						<tr class="sticky top-[25px] z-10 bg-gray-50">
+							{#each $resultsStore.schema as col}
+								<th
+									class="cursor-pointer border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold hover:bg-gray-100"
+									onclick={() => toggleSort(col.name)}
+								>
+									<span class="text-gray-800">{col.name}</span>
+									<span class="ml-1 text-gray-400">{col.type}</span>
+									{#if sortCol === col.name}
+										<span class="ml-0.5">{sortDir === 'asc' ? '\u25B2' : '\u25BC'}</span>
+									{/if}
+								</th>
+							{/each}
+						</tr>
+					</thead>
+					<tbody>
+						{#each sortedData as row, i}
+							<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+								{#each $resultsStore.schema as col}
+									<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
+										{formatCell(row[col.name])}
+									</td>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			{/if}
 		{:else if activeTab === 'history'}
 			<!-- Run History -->

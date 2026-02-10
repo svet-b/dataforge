@@ -66,22 +66,19 @@ export interface RunRequest {
 	parameters?: Record<string, unknown>;
 }
 
+export interface SchemaColumn {
+	name: string;
+	type: string;
+}
+
 export interface RunResponse {
 	run_id: string;
 	status: string;
 	duration_ms: number;
 	row_count: number | null;
 	data: Record<string, unknown>[] | null;
-	error: ExecutionError | null;
-}
-
-export interface SchemaColumn {
-	name: string;
-	type: string;
-}
-
-export interface PreviewResponse extends RunResponse {
 	schema_info: SchemaColumn[];
+	error: ExecutionError | null;
 }
 
 export interface UploadedFileResponse {
@@ -105,6 +102,7 @@ export interface RunHistorySummary {
 	started_at: string;
 	duration_ms: number;
 	row_count: number | null;
+	schema_info: SchemaColumn[] | null;
 	error: ExecutionError | null;
 }
 

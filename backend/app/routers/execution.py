@@ -18,7 +18,7 @@ from app.engine.executor import PipelineExecutor
 from app.models.pipeline import Pipeline
 from app.models.run import RunHistory
 from app.models.uploaded_file import UploadedFile
-from app.schemas.execution import PreviewResponse, RunRequest, RunResponse
+from app.schemas.execution import RunRequest, RunResponse
 
 router = APIRouter(prefix="/api/pipelines", tags=["execution"])
 
@@ -106,7 +106,11 @@ async def run_pipeline(
         parameters=parameters,
     )
 
-    # Store run in run_history
+    schema_info: list[dict[str, str]] = []
+    if exec_result.status == "success" and exec_result.schema_info:
+        schema_info = exec_result.schema_info
+
+    # Store run in run_history (keep up to 10k rows for downloads)
     run_id = str(uuid.uuid4())
     now = datetime.now(UTC).isoformat()
     run = RunHistory(
@@ -118,7 +122,10 @@ async def run_pipeline(
         completed_at=now,
         duration_ms=exec_result.duration_ms,
         row_count=exec_result.row_count,
-        output_preview=_json_safe({"data": exec_result.data[:50]}) if exec_result.data else None,
+        schema_info=schema_info,
+        output_preview=(
+            _json_safe({"data": exec_result.data[:10_000]}) if exec_result.data else None
+        ),
         error=exec_result.error,
     )
     db.add(run)
@@ -136,48 +143,15 @@ async def run_pipeline(
             db.delete(old_run)
         db.commit()
 
+    # Return data capped at 100 rows for the UI
     return RunResponse(
         run_id=run_id,
         status=exec_result.status,
         duration_ms=exec_result.duration_ms,
         row_count=exec_result.row_count,
-        data=_json_safe(exec_result.data) if exec_result.data else None,
-        error=exec_result.error,
-    )
-
-
-@router.post("/{pipeline_id}/preview")
-async def preview_pipeline(
-    pipeline_id: str,
-    body: RunRequest,
-    db: Session = Depends(get_db),
-) -> PreviewResponse:
-    pipeline, sources, query = _load_pipeline(pipeline_id, db)
-    if not query or not query.strip():
-        raise HTTPException(status_code=400, detail="Pipeline has no query defined")
-    parameters = _merge_parameters(pipeline, body.parameters)
-
-    executor = PipelineExecutor(settings)
-    exec_result = await executor.execute(
-        pipeline_id=pipeline_id,
-        sources=sources,
-        query=query,
-        parameters=parameters,
-        preview_limit=50,
-    )
-
-    schema_info: list[dict[str, str]] = []
-    if exec_result.status == "success" and exec_result.schema_info:
-        schema_info = exec_result.schema_info
-
-    return PreviewResponse(
-        run_id=uuid.uuid4(),
-        status=exec_result.status,
-        duration_ms=exec_result.duration_ms,
-        row_count=exec_result.row_count,
-        data=_json_safe(exec_result.data) if exec_result.data else None,
-        error=exec_result.error,
+        data=_json_safe(exec_result.data[:100]) if exec_result.data else None,
         schema_info=schema_info,
+        error=exec_result.error,
     )
 
 

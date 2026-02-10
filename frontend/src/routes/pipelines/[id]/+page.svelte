@@ -5,9 +5,15 @@
 		pipelineStore,
 		loadPipeline,
 		resetPipelineStore,
+		runPipeline,
 	} from '$lib/stores/pipeline.js';
-	import { resetRunsStore } from '$lib/stores/runs.js';
-	import { clearPreview } from '$lib/stores/preview.js';
+	import { resetRunsStore, loadRuns } from '$lib/stores/runs.js';
+	import {
+		clearResults,
+		setResultsLoading,
+		setResults,
+		setResultsError,
+	} from '$lib/stores/results.js';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import SourceList from '$lib/components/SourceList.svelte';
 	import SourceConfigPanel from '$lib/components/SourceConfigPanel.svelte';
@@ -58,13 +64,34 @@
 	onDestroy(() => {
 		resetPipelineStore();
 		resetRunsStore();
-		clearPreview();
+		clearResults();
 	});
 
 	function handleKeydown(e: KeyboardEvent) {
 		if ((e.metaKey || e.ctrlKey) && e.key === 's') {
 			e.preventDefault();
 		}
+	}
+
+	function handleRun() {
+		const params = $pipelineStore.pipeline?.parameters ?? [];
+		if (params.length > 0) {
+			showRunDialog = true;
+		} else {
+			executeRun();
+		}
+	}
+
+	async function executeRun() {
+		setResultsLoading();
+		resultsTab = 'results';
+		const result = await runPipeline(pipelineId);
+		if (result) {
+			setResults(result);
+		} else {
+			setResultsError('Run failed');
+		}
+		await loadRuns(pipelineId);
 	}
 </script>
 
@@ -83,7 +110,7 @@
 			{pipelineId}
 			pipelineName={$pipelineStore.pipeline.name}
 			onOpenParams={() => (showParamModal = true)}
-			onOpenRun={() => (showRunDialog = true)}
+			onRun={handleRun}
 		/>
 
 		<!-- Main content: inputs + query editor -->
@@ -100,7 +127,7 @@
 
 			<!-- Center: SQL query editor -->
 			<div class="flex flex-1 flex-col overflow-hidden bg-white">
-				<QueryEditor {pipelineId} />
+				<QueryEditor {pipelineId} onRun={handleRun} />
 			</div>
 		</div>
 
@@ -136,7 +163,7 @@
 			parameters={$pipelineStore.pipeline.parameters ?? []}
 			onClose={() => (showRunDialog = false)}
 			onRunComplete={() => {
-				resultsTab = 'history';
+				resultsTab = 'results';
 			}}
 		/>
 	{/if}

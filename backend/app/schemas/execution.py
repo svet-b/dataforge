@@ -14,8 +14,5 @@ class RunResponse(BaseModel):
     duration_ms: int
     row_count: int | None
     data: list[dict[str, Any]] | None
-    error: dict[str, Any] | None
-
-
-class PreviewResponse(RunResponse):
     schema_info: list[dict[str, str]]
+    error: dict[str, Any] | None

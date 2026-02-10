@@ -173,12 +173,7 @@ export async function runPipeline(
 ) {
 	try {
 		const result = await api.execution.run(pipelineId, { parameters });
-		if (result.status === 'success') {
-			addToast(
-				`Run complete: ${result.row_count ?? 0} rows in ${result.duration_ms}ms`,
-				'success'
-			);
-		} else {
+		if (result.status !== 'success') {
 			addToast(`Run failed: ${result.error?.message ?? 'Unknown error'}`, 'error');
 		}
 		return result;

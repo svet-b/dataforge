@@ -9,7 +9,6 @@ import type {
 	SourceUpdate,
 	RunRequest,
 	RunResponse,
-	PreviewResponse,
 	UploadedFileResponse,
 	RunHistorySummary,
 	RunHistoryDetail
@@ -87,9 +86,7 @@ export const api = {
 	},
 	execution: {
 		run: (pipelineId: string, data: RunRequest = {}) =>
-			request<RunResponse>('POST', `/api/pipelines/${pipelineId}/run`, data),
-		preview: (pipelineId: string, data: RunRequest = {}) =>
-			request<PreviewResponse>('POST', `/api/pipelines/${pipelineId}/preview`, data)
+			request<RunResponse>('POST', `/api/pipelines/${pipelineId}/run`, data)
 	},
 	files: {
 		upload: (pipelineId: string, file: File) => {

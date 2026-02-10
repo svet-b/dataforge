@@ -13,6 +13,7 @@ class RunHistorySummaryResponse(BaseModel):
     started_at: datetime
     duration_ms: int | None
     row_count: int | None
+    schema_info: list[dict[str, str]] | None
     error: dict[str, Any] | None
 
 
@@ -25,5 +26,6 @@ class RunHistoryResponse(BaseModel):
     completed_at: datetime | None
     duration_ms: int | None
     row_count: int | None
+    schema_info: list[dict[str, str]] | None
     output_preview: dict[str, Any] | None
     error: dict[str, Any] | None

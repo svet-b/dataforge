@@ -1,4 +1,4 @@
-from app.schemas.execution import PreviewResponse, RunRequest, RunResponse
+from app.schemas.execution import RunRequest, RunResponse
 from app.schemas.pipeline import (
     PipelineCreate,
     PipelineDetailResponse,
@@ -18,7 +18,6 @@ __all__ = [
     "PipelineResponse",
     "PipelineSummaryResponse",
     "PipelineUpdate",
-    "PreviewResponse",
     "RunHistoryResponse",
     "RunHistorySummaryResponse",
     "RunRequest",

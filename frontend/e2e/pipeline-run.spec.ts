@@ -9,28 +9,16 @@ test.describe('Pipeline run', () => {
 		await page.goto(`/pipelines/${pipeline.id}`);
 		await expect(page.getByTestId('toolbar')).toBeVisible();
 
+		// No params → Run executes directly (no dialog)
 		await page.getByRole('button', { name: 'Run', exact: true }).click();
-		await expect(page.getByTestId('run-dialog')).toBeVisible();
 
-		await page.getByTestId('run-execute-btn').click();
-
-		// Wait for run to complete -- dialog closes and toast appears
-		await expect(page.getByTestId('run-dialog')).not.toBeVisible({ timeout: 15000 });
-		await expect(page.getByTestId('toast').first()).toBeVisible();
+		// Should see results in the results panel
+		await expect(page.getByText('Showing')).toBeVisible({ timeout: 15000 });
 
 		// Run History tab should show an entry
 		await page.getByTestId('tab-history').click();
-	});
-
-	test('opens run dialog and cancels', async ({ page }) => {
-		const pipeline = await createPipeline('Cancel Run Test');
-		await page.goto(`/pipelines/${pipeline.id}`);
-
-		await page.getByRole('button', { name: 'Run', exact: true }).click();
-		await expect(page.getByTestId('run-dialog')).toBeVisible();
-
-		await page.getByTestId('run-dialog').getByRole('button', { name: 'Cancel' }).click();
-		await expect(page.getByTestId('run-dialog')).not.toBeVisible();
+		const successDot = page.locator('.bg-green-500').first();
+		await expect(successDot).toBeVisible();
 	});
 
 	test('switches between results and history tabs', async ({ page }) => {

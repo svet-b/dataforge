@@ -2,6 +2,7 @@
 	import type { PipelineParameter } from '$lib/types/index.js';
 	import { runPipeline } from '$lib/stores/pipeline.js';
 	import { loadRuns } from '$lib/stores/runs.js';
+	import { setResults, setResultsError } from '$lib/stores/results.js';
 
 	let {
 		pipelineId,
@@ -31,7 +32,12 @@
 			else params[p.name] = val;
 		}
 		try {
-			await runPipeline(pipelineId, params);
+			const result = await runPipeline(pipelineId, params);
+			if (result) {
+				setResults(result);
+			} else {
+				setResultsError('Run failed');
+			}
 			await loadRuns(pipelineId);
 			onRunComplete();
 			onClose();
