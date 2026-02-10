@@ -237,7 +237,7 @@ You are adding LLM-assisted SQL generation to the existing DataForge platform. B
 
 Implement the Claude LLM provider, the SQL generation endpoint, and the chat panel in the frontend. The system prompt for SQL generation is critical — pay close attention to the DuckDB dialect specifics in the spec.
 
-Test with a real API key if available, or mock the LLM responses for automated tests.
+An Anthropic API key has been set in .env, and can be used for testing.
 ```
 
 ---

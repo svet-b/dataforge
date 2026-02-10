@@ -2,13 +2,13 @@
 
 ## Objective
 
-Add LLM-assisted SQL generation to DataForge. Users can describe a transformation in natural language, and the system generates DuckDB SQL via Claude (Anthropic API). The frontend adds a chat panel to the transform node configuration.
+Add LLM-assisted SQL generation to DataForge. Users can describe a transformation in natural language, and the system generates DuckDB SQL via Claude (Anthropic API). The frontend adds a chat panel alongside the SQL query editor.
 
 ## Prerequisites
 
 Stages 1–5 are complete. The full backend and frontend work end-to-end.
 
-**Read the existing code** — especially the transform node config component, the API client, and the backend router patterns.
+**Read the existing code** — especially `QueryEditor.svelte`, `SqlEditor.svelte`, the pipeline store, the API client, and the backend router patterns.
 
 ## Deliverables
 
@@ -122,11 +122,11 @@ DuckDB is a modern analytical SQL engine. You should leverage its features:
 
 1. Output ONLY a SELECT statement. It will be wrapped in CREATE TABLE AS (...).
 2. Do NOT output any DDL (CREATE, DROP, ALTER), DML (INSERT, UPDATE, DELETE), or COPY statements.
-3. Reference pipeline parameters using $param_name syntax (e.g., $start_date, $customer_id).
+3. Reference pipeline parameters using getvariable('param_name') syntax (e.g., getvariable('start_date'), getvariable('customer_id')).
 4. Use CTEs (WITH clauses) for complex multi-step logic — each CTE should have a clear, descriptive name.
 5. Use meaningful column aliases that describe the data.
 6. Add SQL comments for non-obvious logic.
-7. Prefer explicit column names over SELECT * in transforms.
+7. Prefer explicit column names over SELECT * in your queries.
 8. Handle potential NULL values appropriately with COALESCE or NULLIF where relevant.
 9. When aggregating, always include all non-aggregated columns in GROUP BY.
 
@@ -163,7 +163,7 @@ def build_system_prompt(tables: list[dict], parameters: list[dict]) -> str:
     param_lines = []
     for p in parameters:
         desc = f" — {p['description']}" if p.get("description") else ""
-        param_lines.append(f"- ${p['name']} ({p['type']}){desc}")
+        param_lines.append(f"- getvariable('{p['name']}') ({p['type']}){desc}")
     parameter_description = "\n".join(param_lines) if param_lines else "No parameters defined."
 
     return DUCKDB_SQL_SYSTEM_PROMPT.replace(
@@ -206,7 +206,7 @@ router = APIRouter(prefix="/api/llm", tags=["llm"])
 
 class GenerateSQLRequest(BaseModel):
     prompt: str
-    available_tables: list[dict]  # [{"name": str, "columns": [{"name": str, "type": str}]}]
+    available_tables: list[dict]  # From describe-sources: [{"name": str, "columns": [{"name": str, "type": str}]}]
     pipeline_parameters: list[dict]  # [{"name": str, "type": str, "description": str}]
     conversation_history: list[dict] = []  # [{"role": "user"|"assistant", "content": str}]
 
@@ -261,84 +261,96 @@ app.include_router(llm.router)
 
 ### 4. Schema Inference for LLM Context
 
-When the user wants to generate SQL for a transform node, the frontend needs to send the upstream tables' schemas. There are two approaches:
+When the user wants to generate SQL, the LLM needs to know the column names and types of the source tables available in the query. Each pipeline has one or more **sources** (file or API), each with a `table_name`.
 
-**Approach A (preferred): Use DuckDB DESCRIBE after a preview run.**
-If a node has been previewed, we know its output schema. Store schema info in the pipeline store after each preview. The frontend sends this cached schema to the LLM endpoint.
-
-**Approach B (fallback): Add a backend endpoint that infers schema.**
+**Approach A (preferred): Add a backend endpoint that loads sources and describes them.**
 
 ```python
-@router.post("/{pipeline_id}/schema/{node_id}")
-async def get_node_schema(pipeline_id: UUID, node_id: UUID, ...):
-    """Execute the subgraph up to the given node and return DESCRIBE output."""
+@router.post("/{pipeline_id}/describe-sources")
+async def describe_sources(pipeline_id: str, db: Session = Depends(get_db)):
+    """
+    Load each source into a temporary DuckDB session and return DESCRIBE output.
+    Returns: [{"name": "sales_data", "columns": [{"name": "product", "type": "VARCHAR"}, ...]}]
+    """
     ...
 ```
 
-Implement Approach A in the frontend (cache schema after preview), with Approach B as fallback for nodes that haven't been previewed yet.
+This endpoint reuses the existing `_load_source()` logic from the executor. It creates a temporary DuckDB session, loads each source, runs `DESCRIBE <table_name>`, and returns the schema for each table. The frontend calls this before sending the LLM request.
 
-### 5. Frontend: LLM Chat Panel (`components/llm-chat/LlmChat.svelte`)
+**Approach B (supplementary): Cache schema from preview results.**
+After a successful preview run, the `PreviewResponse` already includes `schema_info` for the query *output*. This can be shown in the chat as additional context but is less useful than the source schemas since the LLM needs to know the *input* tables to write the query.
 
-Add an "AI Assistant" section to the Transform Config panel. Position it in the left column, above or alongside the Schema Reference:
+Implement Approach A as the primary mechanism. The frontend calls `describe-sources` when the user opens the AI chat or sends a message, caching the result for the session.
+
+### 5. Frontend: LLM Chat Panel (`components/LlmChat.svelte`)
+
+Add an "AI Assistant" panel as a toggleable right sidebar alongside the SQL query editor. The current layout is:
+
+- **Left panel (w-64):** Source list + source config
+- **Center panel:** Query editor (CodeMirror) + reference pills
+- **Bottom panel:** Results / Run History
+
+The AI chat panel slides in as a right sidebar when the user clicks an "AI" toggle button in the query editor header bar:
 
 ```
-┌─────────────────────────────┬────────────────────────────────────┐
-│  AI Assistant                │  SQL Editor (CodeMirror):          │
-│  ┌──────────────────────┐   │  ┌──────────────────────────────┐  │
-│  │ Chat history:         │   │  │ SELECT                       │  │
-│  │                       │   │  │   meter_id,                  │  │
-│  │ You: Aggregate meter  │   │  │   SUM(energy_kwh)            │  │
-│  │ readings to hourly    │   │  │ FROM meter_readings          │  │
-│  │ intervals             │   │  │ GROUP BY meter_id            │  │
-│  │                       │   │  │                              │  │
-│  │ AI: ✓ Generated SQL   │   │  └──────────────────────────────┘  │
-│  │ (groups by meter and  │   │                                    │
-│  │ hour, sums energy)    │   │  [Apply] [Preview]                 │
-│  │                       │   │                                    │
-│  │ You: Also add a       │   │                                    │
-│  │ filter for voltage    │   │                                    │
-│  │ above 200V            │   │                                    │
-│  │                       │   │                                    │
-│  │ AI: ✓ Updated SQL     │   │                                    │
-│  │ (added WHERE clause)  │   │                                    │
-│  └──────────────────────┘   │                                    │
-│                             │                                    │
-│  ┌──────────────────────┐   │                                    │
-│  │ Describe your query...│   │                                    │
-│  │                  [⏎] │   │                                    │
-│  └──────────────────────┘   │                                    │
-│                             │                                    │
-│  Schema Reference:          │                                    │
-│  (collapsible)              │                                    │
-└─────────────────────────────┴────────────────────────────────────┘
+┌────────────────┬────────────────────────────┬─────────────────────┐
+│ Toolbar:  Pipeline Name               [Parameters]  [Run]         │
+├────────────────┼────────────────────────────┼─────────────────────┤
+│ INPUTS         │ SQL QUERY          [AI][▶] │ AI Assistant         │
+│                │ ┌────────────────────────┐ │ ┌─────────────────┐ │
+│ 📄 sales_data  │ │ [sales_data] [customers]│ │ │ Chat history:   │ │
+│    File        │ ├────────────────────────┤ │ │                 │ │
+│ 🌐 customers   │ │ SELECT                 │ │ │ You: Aggregate  │ │
+│    API         │ │   product,             │ │ │ sales by product│ │
+│                │ │   SUM(amount)          │ │ │                 │ │
+│ ─── Config ─── │ │ FROM sales_data        │ │ │ AI: ✓ Generated │ │
+│ Table: sales.. │ │ JOIN customers USING   │ │ │ (groups by      │ │
+│ File: sales.csv│ │   (customer_id)        │ │ │ product, sums   │ │
+│ Delimiter: ,   │ │ GROUP BY product       │ │ │ amount)         │ │
+│                │ └────────────────────────┘ │ │                 │ │
+│                │                            │ │ Schema:         │ │
+│                │                            │ │ sales_data:     │ │
+│                │                            │ │  product VARCHAR │ │
+│                │                            │ │  amount DOUBLE   │ │
+│                │                            │ ├─────────────────┤ │
+│                │                            │ │ Describe query..│ │
+│                │                            │ │            [⏎]  │ │
+│                │                            │ └─────────────────┘ │
+├────────────────┴────────────────────────────┴─────────────────────┤
+│ [Results] [Run History]                                           │
+│  product  │ total_amount                                          │
+│  Widget   │ 550                                                   │
+│  Gadget   │ 450                                                   │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 **Chat interaction flow:**
 
-1. User types a natural language description in the input box.
-2. User presses Enter or clicks the send button.
-3. The component:
-   a. Collects upstream table schemas (from cached preview data or via API)
+1. User clicks the "AI" toggle in the query editor header to open the chat sidebar.
+2. The component calls `POST /api/pipelines/{id}/describe-sources` to fetch source table schemas (cached for the session).
+3. User types a natural language description in the input box and presses Enter.
+4. The component:
+   a. Collects source table schemas (from the cached describe-sources response)
    b. Collects pipeline parameters
    c. Sends request to `POST /api/llm/generate-sql` with prompt, schemas, parameters, and conversation history
-4. While waiting, show a loading indicator in the chat.
-5. On response:
+5. While waiting, show a loading indicator in the chat.
+6. On response:
    a. Display the explanation in the chat history
-   b. **Automatically populate the SQL editor** with the generated SQL
+   b. **Automatically populate the SQL editor** with the generated SQL (update `queryValue` which triggers the debounced save)
    c. Add a subtle highlight/badge on the SQL editor indicating "AI-generated"
    d. Store the conversation turn in component state for iterative refinement
-6. User can then:
+7. User can then:
    - Click "Preview" to test the generated SQL
    - Edit the SQL manually in the CodeMirror editor
    - Type another message to refine (e.g., "also add a HAVING clause for groups with > 100 readings")
 
 **Chat state management:**
 
-Store per-node conversation history in the pipeline store:
+Store per-pipeline conversation history in a Svelte store (or component-local state):
 
 ```typescript
-interface TransformNodeChat {
-  nodeId: string;
+interface QueryChat {
+  pipelineId: string;
   messages: Array<{
     role: 'user' | 'assistant';
     content: string;
@@ -347,7 +359,7 @@ interface TransformNodeChat {
 }
 ```
 
-This history is maintained only in the client — it's not persisted to the backend (keeping it simple for v1). If the user refreshes, the chat history is lost but the SQL they applied is saved in the node config.
+This history is maintained only in the client — it's not persisted to the backend (keeping it simple for v1). If the user refreshes, the chat history is lost but the SQL they applied is saved in the pipeline's `query` field.
 
 **Error handling:**
 
@@ -405,7 +417,7 @@ def test_build_system_prompt():
     params = [{"name": "start_date", "type": "date", "description": "Start of period"}]
     prompt = build_system_prompt(tables, params)
     assert "readings" in prompt
-    assert "$start_date" in prompt
+    assert "getvariable('start_date')" in prompt
     assert "Start of period" in prompt
 
 def test_parse_llm_response_with_code_block():
@@ -440,10 +452,10 @@ Use dependency injection or monkeypatching to mock the LLM provider in tests, so
 ## Acceptance Criteria
 
 - [ ] `POST /api/llm/generate-sql` returns valid DuckDB SQL from a natural language prompt
-- [ ] The system prompt includes upstream table schemas and pipeline parameters
+- [ ] The system prompt includes source table schemas and pipeline parameters
 - [ ] Conversation history is supported for iterative refinement
 - [ ] LLM response is parsed correctly (SQL extracted from code blocks)
-- [ ] Frontend: LLM chat panel is visible in the Transform Config panel
+- [ ] Frontend: LLM chat panel is toggleable alongside the SQL query editor
 - [ ] Frontend: typing a description and pressing Enter generates SQL
 - [ ] Frontend: generated SQL automatically appears in the CodeMirror editor
 - [ ] Frontend: conversation history allows refinement ("also add a filter for...")
@@ -455,13 +467,14 @@ Use dependency injection or monkeypatching to mock the LLM provider in tests, so
 ## What This Completes
 
 With Stage 6 done, DataForge is feature-complete for v1:
-- Visual pipeline designer with DAG editor
-- Four node types: API source, file source, SQL transform, output
-- DuckDB-based execution engine with parameter injection
+- Pipeline editor with source management, SQL query editor, and results panel
+- Two source types: file upload (CSV/JSON/Parquet) and API (HTTP)
+- Single DuckDB SQL query per pipeline with CTE support for multi-step logic
 - Claude-powered SQL authoring with iterative refinement
-- Data preview at each pipeline step
-- Pipeline execution via API
+- Data preview of query results with schema info
+- Pipeline execution with CSV/JSON download
 - Run history with error diagnostics
+- Parameterised pipelines with `getvariable()` injection
 - Docker dev environment with SQLite
 
 The platform is ready for end-to-end testing and initial use.
