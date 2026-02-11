@@ -31,30 +31,48 @@
 	let showRunDialog = $state(false);
 	let resultsTab = $state('results');
 
-	// Resizable bottom panel
-	let bottomHeight = $state(250);
-	let dragging = $state(false);
-	let startY = 0;
-	let startHeight = 0;
+	// --- Resizable panel state ---
+	// Column widths (pixels)
+	let leftColWidth = $state(280);   // AI Chat
+	let rightColWidth = $state(420);  // Results
+	// Middle column vertical split (pixels from top for sources pane)
+	let sourcesHeight = $state(220);
 
-	let queryEditor: QueryEditor | undefined = $state();
+	// Drag state
+	type DragTarget = 'left-divider' | 'right-divider' | 'middle-divider' | null;
+	let dragTarget: DragTarget = $state(null);
+	let dragStartPos = 0;
+	let dragStartSize = 0;
 
-	function onPointerDown(e: PointerEvent) {
-		dragging = true;
-		startY = e.clientY;
-		startHeight = bottomHeight;
+	function onDividerPointerDown(target: DragTarget, e: PointerEvent) {
+		dragTarget = target;
+		dragStartPos = target === 'middle-divider' ? e.clientY : e.clientX;
+		dragStartSize = target === 'left-divider' ? leftColWidth
+			: target === 'right-divider' ? rightColWidth
+			: sourcesHeight;
 		(e.target as HTMLElement).setPointerCapture(e.pointerId);
 	}
 
-	function onPointerMove(e: PointerEvent) {
-		if (!dragging) return;
-		const delta = startY - e.clientY;
-		bottomHeight = Math.max(80, Math.min(600, startHeight + delta));
+	function onDividerPointerMove(e: PointerEvent) {
+		if (!dragTarget) return;
+		if (dragTarget === 'left-divider') {
+			const delta = e.clientX - dragStartPos;
+			leftColWidth = Math.max(180, Math.min(480, dragStartSize + delta));
+		} else if (dragTarget === 'right-divider') {
+			// Right column grows when mouse moves left
+			const delta = dragStartPos - e.clientX;
+			rightColWidth = Math.max(200, Math.min(700, dragStartSize + delta));
+		} else if (dragTarget === 'middle-divider') {
+			const delta = e.clientY - dragStartPos;
+			sourcesHeight = Math.max(80, Math.min(500, dragStartSize + delta));
+		}
 	}
 
-	function onPointerUp() {
-		dragging = false;
+	function onDividerPointerUp() {
+		dragTarget = null;
 	}
+
+	let queryEditor: QueryEditor | undefined = $state();
 
 	let selectedSource = $derived(
 		$pipelineStore.pipeline?.sources.find(
@@ -124,46 +142,68 @@
 			onRun={handleRun}
 		/>
 
-		<!-- Main content: inputs + query editor + AI chat -->
-		<div class="flex flex-1 overflow-hidden">
-			<!-- Left sidebar: source list + config -->
-			<div class="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
-				<div class="flex-1 overflow-y-auto">
+		<!-- Main content: three-column layout (AI Chat | Sources+SQL | Results) -->
+		<div class="flex flex-1 overflow-hidden" class:select-none={dragTarget !== null}>
+			<!-- Left column: AI Chat -->
+			<div class="flex shrink-0 flex-col bg-white" style="width: {leftColWidth}px;">
+				<LlmChat {pipelineId} onSqlGenerated={handleSqlGenerated} />
+			</div>
+
+			<!-- Left divider (between AI Chat and middle) -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-gray-100 hover:bg-gray-300"
+				onpointerdown={(e) => onDividerPointerDown('left-divider', e)}
+				onpointermove={onDividerPointerMove}
+				onpointerup={onDividerPointerUp}
+			>
+				<div class="h-8 w-0.5 rounded-full bg-gray-400"></div>
+			</div>
+
+			<!-- Middle column: Sources (top) + SQL Editor (bottom) -->
+			<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+				<!-- Sources pane (top) -->
+				<div class="shrink-0 overflow-y-auto bg-white" style="height: {sourcesHeight}px;">
 					<SourceList {pipelineId} />
 					{#if selectedSource}
 						<SourceConfigPanel {pipelineId} source={selectedSource} />
 					{/if}
 				</div>
+
+				<!-- Middle divider (between sources and SQL editor) -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center bg-gray-100 hover:bg-gray-300"
+					onpointerdown={(e) => onDividerPointerDown('middle-divider', e)}
+					onpointermove={onDividerPointerMove}
+					onpointerup={onDividerPointerUp}
+				>
+					<div class="h-0.5 w-8 rounded-full bg-gray-400"></div>
+				</div>
+
+				<!-- SQL Editor pane (bottom) -->
+				<div class="flex flex-1 flex-col overflow-hidden bg-white">
+					<QueryEditor
+						bind:this={queryEditor}
+						{pipelineId}
+						onRun={handleRun}
+					/>
+				</div>
 			</div>
 
-			<!-- Center: SQL query editor -->
-			<div class="flex flex-1 flex-col overflow-hidden bg-white">
-				<QueryEditor
-					bind:this={queryEditor}
-					{pipelineId}
-					onRun={handleRun}
-				/>
-			</div>
-
-			<!-- Right sidebar: AI chat -->
-			<div class="flex w-80 shrink-0 flex-col border-l border-gray-200 bg-white">
-				<LlmChat {pipelineId} onSqlGenerated={handleSqlGenerated} />
-			</div>
-		</div>
-
-		<!-- Bottom: results panel with resize handle -->
-		<div class="flex flex-col border-t border-gray-200 bg-white" style="height: {bottomHeight}px;">
-			<!-- Resize handle -->
+			<!-- Right divider (between middle and Results) -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
-				class="flex h-1.5 cursor-row-resize items-center justify-center bg-gray-100 hover:bg-gray-200"
-				onpointerdown={onPointerDown}
-				onpointermove={onPointerMove}
-				onpointerup={onPointerUp}
+				class="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-gray-100 hover:bg-gray-300"
+				onpointerdown={(e) => onDividerPointerDown('right-divider', e)}
+				onpointermove={onDividerPointerMove}
+				onpointerup={onDividerPointerUp}
 			>
-				<div class="h-0.5 w-8 rounded-full bg-gray-400"></div>
+				<div class="h-8 w-0.5 rounded-full bg-gray-400"></div>
 			</div>
-			<div class="flex-1 overflow-hidden">
+
+			<!-- Right column: Results -->
+			<div class="flex shrink-0 flex-col bg-white" style="width: {rightColWidth}px;">
 				<ResultsPanel {pipelineId} bind:activeTab={resultsTab} />
 			</div>
 		</div>
