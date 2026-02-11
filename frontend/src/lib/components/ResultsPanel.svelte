@@ -12,6 +12,7 @@
 		selectSource,
 	} from '$lib/stores/sourcePreview.js';
 	import { api } from '$lib/api/client.js';
+	import DataTable from './DataTable.svelte';
 
 	let {
 		pipelineId,
@@ -20,33 +21,6 @@
 		pipelineId: string;
 		activeTab: string;
 	} = $props();
-
-	let sortCol = $state<string | null>(null);
-	let sortDir = $state<'asc' | 'desc'>('asc');
-
-	function toggleSort(col: string) {
-		if (sortCol === col) {
-			sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-		} else {
-			sortCol = col;
-			sortDir = 'asc';
-		}
-	}
-
-	let sortedData = $derived.by(() => {
-		const data = $resultsStore.data;
-		if (!sortCol || data.length === 0) return data;
-		const col = sortCol;
-		const dir = sortDir === 'asc' ? 1 : -1;
-		return [...data].sort((a, b) => {
-			const av = a[col], bv = b[col];
-			if (av == null && bv == null) return 0;
-			if (av == null) return dir;
-			if (bv == null) return -dir;
-			if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
-			return String(av).localeCompare(String(bv)) * dir;
-		});
-	});
 
 	// Run history
 	let expandedRunId = $state<string | null>(null);
@@ -144,7 +118,7 @@
 	</div>
 
 	<!-- Content -->
-	<div class="flex-1 overflow-auto">
+	<div class="flex flex-1 flex-col overflow-hidden {activeTab !== 'results' ? 'overflow-y-auto' : ''}">
 		{#if activeTab === 'inputs'}
 			<!-- Source Inputs -->
 			{#if $sourcePreviewStore.loading}
@@ -288,9 +262,9 @@
 					No results yet. Click Run to execute the pipeline.
 				</div>
 			{:else}
-				<div class="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-3 py-1">
+				<div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3 py-1">
 					<span class="text-xs text-gray-500">
-						Showing {sortedData.length} of {$resultsStore.rowCount ?? sortedData.length} rows
+						Showing {$resultsStore.data.length} of {$resultsStore.rowCount ?? $resultsStore.data.length} rows
 						{#if $resultsStore.durationMs != null}
 							&middot; {$resultsStore.durationMs}ms
 						{/if}
@@ -314,35 +288,9 @@
 						</div>
 					{/if}
 				</div>
-				<table class="w-full border-collapse font-mono text-xs">
-					<thead>
-						<tr class="sticky top-[25px] z-10 bg-gray-50">
-							{#each $resultsStore.schema as col}
-								<th
-									class="cursor-pointer border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold hover:bg-gray-100"
-									onclick={() => toggleSort(col.name)}
-								>
-									<span class="text-gray-800">{col.name}</span>
-									<span class="ml-1 text-gray-400">{col.type}</span>
-									{#if sortCol === col.name}
-										<span class="ml-0.5">{sortDir === 'asc' ? '\u25B2' : '\u25BC'}</span>
-									{/if}
-								</th>
-							{/each}
-						</tr>
-					</thead>
-					<tbody>
-						{#each sortedData as row, i}
-							<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-								{#each $resultsStore.schema as col}
-									<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
-										{formatCell(row[col.name])}
-									</td>
-								{/each}
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<div class="min-h-0 flex-1">
+					<DataTable data={$resultsStore.data} schema={$resultsStore.schema} />
+				</div>
 			{/if}
 		{:else if activeTab === 'history'}
 			<!-- Run History -->
