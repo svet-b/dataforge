@@ -34,10 +34,10 @@ Items are listed in priority order and should be addressed starting from 1.
 
 ---
 
-4. AI Agent
+4. ~~AI Agent~~ **DONE**
 
-- **Pass current query to the agent:** The LLM agent must be able to see the current SQL query so that it can modify it when asked (e.g., "add a WHERE clause"). Currently it does not appear to receive the current query.
-- **Put generated SQL in the editor, not the chat:** When the agent produces SQL, it should be placed directly into the SQL query editor area (replacing the current contents), rather than being displayed as a message in the chat. The chat should confirm what was done in plain text (e.g., "I've updated the query to filter by date"). As now, the agent should generate the FULL query, rather than a diff.
+~~- **Pass current query to the agent:** The LLM agent must be able to see the current SQL query so that it can modify it when asked (e.g., "add a WHERE clause"). Currently it does not appear to receive the current query.~~
+~~- **Put generated SQL in the editor, not the chat:** When the agent produces SQL, it should be placed directly into the SQL query editor area (replacing the current contents), rather than being displayed as a message in the chat. The chat should confirm what was done in plain text (e.g., "I've updated the query to filter by date"). As now, the agent should generate the FULL query, rather than a diff.~~
 
 ---
 

@@ -17,6 +17,7 @@ class GenerateSQLRequest(BaseModel):
     available_tables: list[dict[str, object]]
     pipeline_parameters: list[dict[str, object]]
     conversation_history: list[dict[str, str]] = []
+    current_query: str | None = None
 
 
 class GenerateSQLResponse(BaseModel):
@@ -33,7 +34,9 @@ async def generate_sql(body: GenerateSQLRequest) -> GenerateSQLResponse:
             detail="LLM provider not configured. Set ANTHROPIC_API_KEY in environment.",
         )
 
-    system_prompt = build_system_prompt(body.available_tables, body.pipeline_parameters)
+    system_prompt = build_system_prompt(
+        body.available_tables, body.pipeline_parameters, body.current_query
+    )
 
     if body.conversation_history:
         messages = body.conversation_history + [{"role": "user", "content": body.prompt}]
