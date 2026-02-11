@@ -2,17 +2,12 @@ Items are listed in priority order and should be addressed starting from 1.
 
 ---
 
-1. Inputs
+1. ~~Inputs~~ **DONE**
 
-Two issues:
+~~Two issues:~~
 
-- **Table naming:** Inputs (and the corresponding DuckDB table names) should be derived from the file name or API endpoint path, rather than generic names like `file_1` or `api_1`.
-  - For a file called `meter_data.csv`, the table should be `meter_data`.
-  - For an API endpoint at `http://some.api.io/api/v1/tariff-data`, the table should be `tariff_data`.
-  - Table names must be strict SQL identifiers: alphanumeric and underscores only. Replace any other characters (hyphens, spaces, dots, etc.) with underscores. If the resulting name begins with a digit, prepend `_` (e.g. `2024_data.csv` becomes `_2024_data`). Collapse consecutive underscores into one. Strip the file extension before deriving the name.
-  - If two sources would produce the same table name, append `_2`, `_3`, etc. to disambiguate.
-
-- **Show schema in Inputs panel:** Currently, the schema of an input is only shown when an AI agent chat is initiated. Instead, display the schema (column names and types) directly in the respective input's card/section within the Inputs panel.
+~~- **Table naming:** Inputs (and the corresponding DuckDB table names) should be derived from the file name or API endpoint path, rather than generic names like `file_1` or `api_1`.~~
+~~- **Show schema in Inputs panel:** Display the schema (column names and types) directly in the respective input's card/section within the Inputs panel.~~
 
 ---
 

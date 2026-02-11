@@ -153,6 +153,11 @@ export interface SourcePreviewResponse {
 	sources: SourcePreviewResult[];
 }
 
+export interface SourceSchemaResponse {
+	columns: SchemaColumn[];
+	row_count: number;
+}
+
 // CTE Inspection types
 
 export interface CTEResult {

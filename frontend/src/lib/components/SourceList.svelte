@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SourceResponse, SourceType } from '$lib/types/index.js';
 	import { addSource, deleteSource, selectSource, pipelineStore } from '$lib/stores/pipeline.js';
+	import { deriveTableName } from '$lib/utils/tableName.js';
 
 	let { pipelineId }: { pipelineId: string } = $props();
 
@@ -8,11 +9,11 @@
 	let selectedSourceId = $derived($pipelineStore.selectedSourceId);
 
 	let showAddMenu = $state(false);
-	let sourceCounter = $state(0);
 
 	function handleAdd(type: SourceType) {
-		sourceCounter++;
-		const tableName = type === 'file' ? `file_${sourceCounter}` : `api_${sourceCounter}`;
+		const existingNames = sources.map((s) => s.table_name);
+		const prefix = type === 'file' ? 'file' : 'api';
+		const tableName = deriveTableName(prefix, existingNames);
 		addSource(pipelineId, type, tableName);
 		showAddMenu = false;
 	}

@@ -45,3 +45,8 @@ class CTEInspectionResponse(BaseModel):
     duration_ms: int
     ctes: list[CTEResultResponse]
     error: dict[str, Any] | None
+
+
+class SourceSchemaResponse(BaseModel):
+    columns: list[dict[str, str]]
+    row_count: int

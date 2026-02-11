@@ -12,12 +12,12 @@ import type {
 	UploadedFileResponse,
 	RunHistorySummary,
 	RunHistoryDetail,
-	TableSchema,
 	GenerateSQLRequest,
 	GenerateSQLResponse,
 	LlmStatus,
 	CTEInspectionResponse,
-	SourcePreviewResponse
+	SourcePreviewResponse,
+	SourceSchemaResponse
 } from '$lib/types/index.js';
 
 export class ApiError extends Error {
@@ -88,7 +88,12 @@ export const api = {
 				data
 			),
 		delete: (pipelineId: string, sourceId: string) =>
-			request<void>('DELETE', `/api/pipelines/${pipelineId}/sources/${sourceId}`)
+			request<void>('DELETE', `/api/pipelines/${pipelineId}/sources/${sourceId}`),
+		schema: (pipelineId: string, sourceId: string) =>
+			request<SourceSchemaResponse>(
+				'POST',
+				`/api/pipelines/${pipelineId}/sources/${sourceId}/schema`
+			)
 	},
 	execution: {
 		run: (pipelineId: string, data: RunRequest = {}) =>
@@ -133,11 +138,7 @@ export const api = {
 		url: (pipelineId: string, runId: string, format: 'csv' | 'json') =>
 			`/api/pipelines/${pipelineId}/runs/${runId}/download?format=${format}`
 	},
-	describeSources: {
-		get: (pipelineId: string) =>
-			request<TableSchema[]>('POST', `/api/pipelines/${pipelineId}/describe-sources`)
-	},
-	llm: {
+llm: {
 		generateSql: (data: GenerateSQLRequest) =>
 			request<GenerateSQLResponse>('POST', '/api/llm/generate-sql', data),
 		status: () => request<LlmStatus>('GET', '/api/llm/status')

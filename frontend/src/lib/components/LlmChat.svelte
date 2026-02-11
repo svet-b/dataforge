@@ -40,8 +40,19 @@
 
 	async function loadSchemas() {
 		if (schemasLoaded) return;
+		const sources = $pipelineStore.pipeline?.sources ?? [];
 		try {
-			schemas = await api.describeSources.get(pipelineId);
+			const results = await Promise.all(
+				sources.map(async (s) => {
+					try {
+						const schema = await api.sources.schema(pipelineId, s.id);
+						return { name: s.table_name, columns: schema.columns };
+					} catch {
+						return { name: s.table_name, columns: [] };
+					}
+				})
+			);
+			schemas = results;
 			schemasLoaded = true;
 		} catch {
 			// schemas will remain empty; LLM can still generate SQL without them
@@ -121,23 +132,6 @@
 			</p>
 		</div>
 	{:else}
-		<!-- Schema info -->
-		{#if schemas.length > 0}
-			<div class="border-b border-gray-100 px-3 py-2">
-				<p class="mb-1 text-xs font-medium text-gray-400">Available tables:</p>
-				{#each schemas as table}
-					<div class="mb-1">
-						<span class="text-xs font-medium text-gray-600">{table.name}</span>
-						{#if table.columns.length > 0}
-							<span class="text-xs text-gray-400">
-								({table.columns.map((c) => c.name).join(', ')})
-							</span>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/if}
-
 		<!-- Chat messages -->
 		<div bind:this={chatContainer} class="flex-1 overflow-y-auto p-3">
 			{#if messages.length === 0}

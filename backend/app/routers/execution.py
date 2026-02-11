@@ -17,12 +17,14 @@ from app.database import get_db
 from app.engine.executor import PipelineExecutor
 from app.models.pipeline import Pipeline
 from app.models.run import RunHistory
+from app.models.source import Source
 from app.models.uploaded_file import UploadedFile
 from app.schemas.execution import (
     CTEInspectionResponse,
     RunRequest,
     RunResponse,
     SourcePreviewResponse,
+    SourceSchemaResponse,
 )
 
 router = APIRouter(prefix="/api/pipelines", tags=["execution"])
@@ -247,37 +249,55 @@ async def preview_sources(
     )
 
 
-@router.post("/{pipeline_id}/describe-sources")
-async def describe_sources(
+@router.post("/{pipeline_id}/sources/{source_id}/schema")
+async def source_schema(
     pipeline_id: str,
+    source_id: str,
     db: Session = Depends(get_db),
-) -> list[dict[str, Any]]:
-    """Load each source into a temporary DuckDB session and return schema info.
+) -> SourceSchemaResponse:
+    """Load a single source into DuckDB and return its schema and row count."""
+    pipeline = db.get(Pipeline, pipeline_id)
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
 
-    Returns: [{"name": "table_name", "columns": [{"name": "col", "type": "VARCHAR"}, ...]}]
-    """
-    pipeline, sources, _query = _load_pipeline(pipeline_id, db)
-    if not sources:
-        return []
+    source_model = db.get(Source, source_id)
+    if not source_model or source_model.pipeline_id != pipeline_id:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    # Resolve file path if needed
+    uploaded_files = db.query(UploadedFile).filter(UploadedFile.pipeline_id == pipeline_id).all()
+    file_path_map = {uf.filename: uf.storage_path for uf in uploaded_files}
+    config = dict(source_model.config)
+    if (
+        source_model.type == "file"
+        and "filename" in config
+        and "file_path" not in config
+    ):
+        filename = config["filename"]
+        if filename in file_path_map:
+            config["file_path"] = file_path_map[filename]
+
+    source_dict = {
+        "id": source_model.id,
+        "type": source_model.type,
+        "table_name": source_model.table_name,
+        "config": config,
+    }
 
     from app.engine.duckdb_manager import DuckDBSession
 
     executor = PipelineExecutor(settings)
     session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
-    result: list[dict[str, Any]] = []
     try:
-        for source in sources:
-            try:
-                await executor._load_source(session, source, {})
-                schema = session.get_table_schema(source["table_name"])
-                result.append({"name": source["table_name"], "columns": schema})
-            except Exception:
-                # If a source fails to load, skip it (e.g., missing file)
-                result.append({"name": source["table_name"], "columns": []})
+        await executor._load_source(session, source_dict, {})
+        columns = session.get_table_schema(source_model.table_name)
+        row_count = session.get_row_count(source_model.table_name)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     finally:
         session.close()
 
-    return result
+    return SourceSchemaResponse(columns=columns, row_count=row_count)
 
 
 @router.get("/{pipeline_id}/runs/{run_id}/download")

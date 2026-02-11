@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { SourceResponse } from '$lib/types/index.js';
-	import { updateSource } from '$lib/stores/pipeline.js';
+	import type { SourceResponse, SchemaColumn } from '$lib/types/index.js';
+	import { updateSource, pipelineStore } from '$lib/stores/pipeline.js';
 	import { api } from '$lib/api/client.js';
 	import { addToast } from '$lib/stores/toasts.js';
 	import { debounce } from '$lib/utils/debounce.js';
+	import { deriveTableName, tableNameFromUrl } from '$lib/utils/tableName.js';
 	import KeyValueEditor from '$lib/components/panel/config/KeyValueEditor.svelte';
 
 	let {
@@ -46,6 +47,59 @@
 	// ── Common ──
 	// svelte-ignore state_referenced_locally
 	let tableName = $state(source.table_name);
+
+	/** Table names of other sources in this pipeline (for dedup). */
+	let otherTableNames = $derived(
+		($pipelineStore.pipeline?.sources ?? [])
+			.filter((s) => s.id !== source.id)
+			.map((s) => s.table_name)
+	);
+
+	/** Whether the user has manually edited the table name. */
+	let tableNameManuallyEdited = $state(false);
+
+	// ── Schema state ──
+	let schemaColumns = $state<SchemaColumn[]>([]);
+	let schemaRowCount = $state<number | null>(null);
+	let schemaLoading = $state(false);
+	let schemaError = $state<string | null>(null);
+
+	/** Whether this source has enough config to fetch schema. */
+	let sourceConfigured = $derived(
+		source.type === 'file'
+			? !!(source.config.filename as string)
+			: !!(source.config.url as string)
+	);
+
+	async function fetchSchema() {
+		schemaLoading = true;
+		schemaError = null;
+		try {
+			const result = await api.sources.schema(pipelineId, source.id);
+			schemaColumns = result.columns;
+			schemaRowCount = result.row_count;
+		} catch (e) {
+			schemaError = e instanceof Error ? e.message : 'Failed to load schema';
+			schemaColumns = [];
+			schemaRowCount = null;
+		} finally {
+			schemaLoading = false;
+		}
+	}
+
+	// Auto-fetch schema when source is configured (and when source identity changes)
+	$effect(() => {
+		// Read source.id and sourceConfigured to establish reactivity
+		const _id = source.id;
+		const _configured = sourceConfigured;
+		if (_configured) {
+			fetchSchema();
+		} else {
+			schemaColumns = [];
+			schemaRowCount = null;
+			schemaError = null;
+		}
+	});
 
 	// Reset state when source changes
 	$effect(() => {
@@ -94,14 +148,38 @@
 		saveConfig();
 	}
 
+	function onTableNameInput() {
+		tableNameManuallyEdited = true;
+		saveConfig();
+	}
+
+	function onUrlInput() {
+		// Auto-derive table name from URL (unless user manually edited it)
+		if (!tableNameManuallyEdited) {
+			const segment = tableNameFromUrl(url);
+			if (segment) {
+				tableName = deriveTableName(segment, otherTableNames);
+			}
+		}
+		saveConfig();
+	}
+
 	async function handleFile(file: File) {
 		uploading = true;
 		try {
 			const result = await api.files.upload(pipelineId, file);
 			filename = result.filename;
 			fileType = result.file_type;
+
+			// Auto-derive table name from filename (unless user manually edited it)
+			if (!tableNameManuallyEdited) {
+				tableName = deriveTableName(result.filename, otherTableNames);
+			}
+
 			saveConfig.cancel();
 			saveConfig();
+			// Refresh schema after config is saved
+			setTimeout(() => fetchSchema(), 600);
 			addToast(`Uploaded ${result.filename}`, 'success');
 		} catch (e) {
 			addToast(`Upload failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -139,7 +217,7 @@
 			<input
 				class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
 				bind:value={tableName}
-				oninput={onchange}
+				oninput={onTableNameInput}
 				placeholder="my_table"
 			/>
 		</div>
@@ -194,7 +272,7 @@
 				<input
 					class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
 					bind:value={url}
-					oninput={onchange}
+					oninput={onUrlInput}
 					placeholder="https://api.example.com/data"
 				/>
 			</div>
@@ -237,6 +315,38 @@
 					oninput={onchange}
 					placeholder="data.results"
 				/>
+			</div>
+		{/if}
+
+		<!-- Schema display -->
+		{#if schemaLoading}
+			<div class="pt-1">
+				<p class="text-xs text-gray-400">Loading schema...</p>
+			</div>
+		{:else if schemaError}
+			<div class="pt-1">
+				<p class="text-xs text-red-400">{schemaError}</p>
+			</div>
+		{:else if schemaColumns.length > 0}
+			<div class="pt-1">
+				<div class="mb-1 flex items-center justify-between">
+					<span class="text-xs font-medium text-gray-600">Schema</span>
+					{#if schemaRowCount !== null}
+						<span class="text-xs text-gray-400">{schemaRowCount.toLocaleString()} rows</span>
+					{/if}
+				</div>
+				<div class="max-h-48 overflow-y-auto rounded border border-gray-200 bg-white">
+					<table class="w-full text-xs">
+						<tbody>
+							{#each schemaColumns as col, i}
+								<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+									<td class="px-2 py-1 font-medium text-gray-700">{col.name}</td>
+									<td class="px-2 py-1 text-right font-mono text-gray-400">{col.type}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
 			</div>
 		{/if}
 	</div>
