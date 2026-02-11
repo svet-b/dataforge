@@ -13,6 +13,7 @@
 	} from '$lib/stores/sourcePreview.js';
 	import { api } from '$lib/api/client.js';
 	import DataTable from './DataTable.svelte';
+	import ResultsChart from './ResultsChart.svelte';
 
 	let {
 		pipelineId,
@@ -74,6 +75,32 @@
 			loadCteInspection(pipelineId, $resultsStore.runId);
 		}
 	});
+
+	// --- Vertical split divider for results tab ---
+	let splitPercent = $state(55); // table gets 55% by default
+	let isDraggingSplit = $state(false);
+	let splitContainerEl: HTMLDivElement | undefined = $state();
+
+	function onSplitMouseDown(e: MouseEvent) {
+		e.preventDefault();
+		isDraggingSplit = true;
+
+		function onMouseMove(e: MouseEvent) {
+			if (!splitContainerEl) return;
+			const rect = splitContainerEl.getBoundingClientRect();
+			const pct = ((e.clientY - rect.top) / rect.height) * 100;
+			splitPercent = Math.max(15, Math.min(85, pct));
+		}
+
+		function onMouseUp() {
+			isDraggingSplit = false;
+			window.removeEventListener('mousemove', onMouseMove);
+			window.removeEventListener('mouseup', onMouseUp);
+		}
+
+		window.addEventListener('mousemove', onMouseMove);
+		window.addEventListener('mouseup', onMouseUp);
+	}
 </script>
 
 <div class="flex h-full flex-col">
@@ -246,7 +273,7 @@
 				{/if}
 			{/if}
 		{:else if activeTab === 'results'}
-			<!-- Results table -->
+			<!-- Results: split into table (top) and chart (bottom) -->
 			{#if $resultsStore.loading}
 				<div class="flex h-full items-center justify-center text-sm text-gray-500">
 					<svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -262,34 +289,58 @@
 					No results yet. Click Run to execute the pipeline.
 				</div>
 			{:else}
-				<div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3 py-1">
-					<span class="text-xs text-gray-500">
-						Showing {$resultsStore.data.length} of {$resultsStore.rowCount ?? $resultsStore.data.length} rows
-						{#if $resultsStore.durationMs != null}
-							&middot; {$resultsStore.durationMs}ms
-						{/if}
-					</span>
-					{#if $resultsStore.runId}
-						<div class="flex gap-1.5" data-testid="download-buttons">
-							<a
-								href={downloadUrl($resultsStore.runId, 'csv')}
-								class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
-								download
-							>
-								CSV
-							</a>
-							<a
-								href={downloadUrl($resultsStore.runId, 'json')}
-								class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
-								download
-							>
-								JSON
-							</a>
+				<div
+					class="flex min-h-0 flex-1 flex-col"
+					bind:this={splitContainerEl}
+					class:select-none={isDraggingSplit}
+				>
+					<!-- Top: Data table -->
+					<div class="flex flex-col overflow-hidden" style="height: {splitPercent}%;">
+						<div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3 py-1">
+							<span class="text-xs text-gray-500">
+								Showing {$resultsStore.data.length} of {$resultsStore.rowCount ?? $resultsStore.data.length} rows
+								{#if $resultsStore.durationMs != null}
+									&middot; {$resultsStore.durationMs}ms
+								{/if}
+							</span>
+							{#if $resultsStore.runId}
+								<div class="flex gap-1.5" data-testid="download-buttons">
+									<a
+										href={downloadUrl($resultsStore.runId, 'csv')}
+										class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+										download
+									>
+										CSV
+									</a>
+									<a
+										href={downloadUrl($resultsStore.runId, 'json')}
+										class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+										download
+									>
+										JSON
+									</a>
+								</div>
+							{/if}
 						</div>
-					{/if}
-				</div>
-				<div class="min-h-0 flex-1">
-					<DataTable data={$resultsStore.data} schema={$resultsStore.schema} />
+						<div class="min-h-0 flex-1">
+							<DataTable data={$resultsStore.data} schema={$resultsStore.schema} />
+						</div>
+					</div>
+
+					<!-- Drag handle -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+					<div
+						class="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center border-y border-gray-200 bg-gray-100 hover:bg-gray-200 transition-colors"
+						onmousedown={onSplitMouseDown}
+						role="separator"
+					>
+						<div class="h-0.5 w-8 rounded-full bg-gray-400"></div>
+					</div>
+
+					<!-- Bottom: Chart -->
+					<div class="flex flex-col overflow-hidden" style="height: {100 - splitPercent}%;">
+						<ResultsChart data={$resultsStore.data} schema={$resultsStore.schema} />
+					</div>
 				</div>
 			{/if}
 		{:else if activeTab === 'history'}

@@ -22,15 +22,15 @@ Items are listed in priority order and should be addressed starting from 1.
 
 ---
 
-3. Results visualization
+3. ~~Results visualization~~ **DONE**
 
-Split the right-side results panel into two vertical sections: data table on top, visualization on the bottom. The bottom section shows a chart of the currently selected result table.
+~~Split the right-side results panel into two vertical sections: data table on top, visualization on the bottom. The bottom section shows a chart of the currently selected result table.~~
 
-Use **Chart.js** (via `svelte-chartjs` or equivalent Svelte wrapper).
+~~Use **Chart.js** (via `svelte-chartjs` or equivalent Svelte wrapper).~~
 
-- **Axis selection:** Auto-detect axes by default — use the first string or date column as the x-axis, and all numeric columns as y-axis series. Show dropdown controls above the chart so the user can override the x-axis column and toggle which numeric columns are included as series.
-- **Initial chart type:** Bar chart. The implementation should be structured so that additional chart types (line, scatter, etc.) can be added later without major refactoring.
-- **Edge cases:** If the result set has no numeric columns, or is empty, show a message instead of a chart (e.g., "No numeric data to visualize").
+~~- **Axis selection:** Auto-detect axes by default — use the first string or date column as the x-axis, and all numeric columns as y-axis series. Show dropdown controls above the chart so the user can override the x-axis column and toggle which numeric columns are included as series.~~
+~~- **Initial chart type:** Bar chart. The implementation should be structured so that additional chart types (line, scatter, etc.) can be added later without major refactoring.~~
+~~- **Edge cases:** If the result set has no numeric columns, or is empty, show a message instead of a chart (e.g., "No numeric data to visualize").~~
 
 ---
 
