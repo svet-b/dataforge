@@ -11,14 +11,14 @@ Items are listed in priority order and should be addressed starting from 1.
 
 ---
 
-2. Results table
+2. ~~Results table~~ **DONE**
 
-Upgrade the results table using **TanStack Table** (Svelte adapter). Requirements:
+~~Upgrade the results table using **TanStack Table** (Svelte adapter). Requirements:~~
 
-- The table header and table name/tabs above it should scroll independently — the table body should scroll horizontally on its own.
-- Columns should be resizable, with initial width auto-sized to fit content.
-- Numbers should be right-aligned and have the same precision, based on number of significant figures (e.g. 10)
-- Include column sorting (click header to toggle asc/desc).
+~~- The table header and table name/tabs above it should scroll independently — the table body should scroll horizontally on its own.~~
+~~- Columns should be resizable, with initial width auto-sized to fit content.~~
+~~- Numbers should be right-aligned and have the same precision, based on number of significant figures (e.g. 10)~~
+~~- Include column sorting (click header to toggle asc/desc).~~
 
 ---
 
