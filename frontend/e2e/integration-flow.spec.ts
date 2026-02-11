@@ -10,7 +10,7 @@ test.describe('Integration: CSV → SQL Query → Run', () => {
 
 		// --- Setup via API: pipeline + file source ---
 		const pipeline = await createPipeline('CSV Integration Test');
-		await addSource(pipeline.id, 'file', 'sales_data');
+		await addSource(pipeline.id, 'file', 'sales');
 
 		// --- Navigate to the pipeline editor ---
 		await page.goto(`/pipelines/${pipeline.id}`);
@@ -55,7 +55,7 @@ test.describe('Integration: CSV → SQL Query → Run', () => {
 		// for Playwright typing, so we set it programmatically)
 		// ============================================================
 		const sqlQuery =
-			'SELECT product, SUM(amount) as total_amount FROM sales_data GROUP BY product ORDER BY product';
+			'SELECT product, SUM(amount) as total_amount FROM sales GROUP BY product ORDER BY product';
 		await updatePipeline(pipeline.id, { query: sqlQuery });
 
 		// Reload so the editor picks up the query
