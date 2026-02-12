@@ -181,3 +181,15 @@ def test_llm_status_unavailable(client: TestClient) -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "unavailable"
+
+
+# ── Performance prompt ───────────────────────────────────────
+
+
+def test_system_prompt_contains_performance_guidelines() -> None:
+    prompt = build_system_prompt([], [])
+    assert "## Performance" in prompt
+    assert "Filter early" in prompt
+    assert "Avoid unnecessary DISTINCT" in prompt
+    assert "Prefer JOINs over correlated subqueries" in prompt
+    assert "Select only needed columns" in prompt

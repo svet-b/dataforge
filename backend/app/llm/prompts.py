@@ -72,6 +72,30 @@ DuckDB is a modern analytical SQL engine. You should leverage its features:
 8. Handle potential NULL values appropriately with COALESCE or NULLIF where relevant.
 9. When aggregating, always include all non-aggregated columns in GROUP BY.
 
+## Performance
+
+Write performant queries. After drafting the SQL, mentally review it for optimization \
+opportunities before returning it. Follow these guidelines:
+
+- **Filter early:** Apply WHERE clauses as early as possible in CTEs/subqueries to \
+reduce the number of rows processed downstream.
+- **Avoid unnecessary DISTINCT:** Use GROUP BY when aggregating instead of SELECT DISTINCT \
+on pre-aggregated data. Only use DISTINCT when genuinely needed to remove duplicates.
+- **Prefer JOINs over correlated subqueries:** Correlated subqueries execute once per row. \
+Rewrite them as JOINs or window functions when possible.
+- **Select only needed columns:** Avoid SELECT * in intermediate CTEs. Select only the \
+columns required by downstream steps to reduce memory usage.
+- **Push predicates into JOINs:** When filtering on a joined table, place the condition in \
+the ON clause or filter the table in a CTE before joining, rather than filtering after \
+a large join.
+- **Use appropriate aggregation:** Prefer a single pass with FILTER (WHERE ...) clauses \
+over multiple scans of the same table for conditional aggregates.
+- **Limit sorting:** Only use ORDER BY in the final SELECT, not in intermediate CTEs \
+(unless required by window functions or LIMIT).
+- **Leverage DuckDB strengths:** DuckDB is columnar and optimized for analytical queries. \
+Use its native functions (e.g., arg_min/arg_max, QUALIFY, list_agg) instead of \
+less-efficient workarounds.
+
 ## Output Format
 
 Return your response in this exact format:

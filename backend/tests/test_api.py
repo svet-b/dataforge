@@ -349,3 +349,65 @@ def test_full_workflow(client: TestClient) -> None:
     files = client.get(f"/api/pipelines/{pid}/files").json()
     assert len(files) == 1
     assert files[0]["filename"] == "extra.csv"
+
+
+# ── Validate Query ──────────────────────────────────────────────
+
+
+def test_validate_query_valid(client: TestClient) -> None:
+    """A valid query against loaded sources should return valid=True."""
+    pipeline = _create_pipeline(client)
+    pid = pipeline["id"]
+
+    csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
+    _add_source(client, pid, "file", "raw_data", {"file_path": csv_path, "file_type": "csv"})
+
+    resp = client.post(
+        f"/api/pipelines/{pid}/validate-query",
+        json={"query": "SELECT meter_id, energy_kwh FROM raw_data"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["valid"] is True
+    assert data["error"] is None
+
+
+def test_validate_query_invalid_column(client: TestClient) -> None:
+    """Referencing a non-existent column should return valid=False with an error."""
+    pipeline = _create_pipeline(client)
+    pid = pipeline["id"]
+
+    csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
+    _add_source(client, pid, "file", "raw_data", {"file_path": csv_path, "file_type": "csv"})
+
+    resp = client.post(
+        f"/api/pipelines/{pid}/validate-query",
+        json={"query": "SELECT nonexistent FROM raw_data"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["valid"] is False
+    assert data["error"] is not None
+    assert "nonexistent" in data["error"].lower()
+
+
+def test_validate_query_no_sources(client: TestClient) -> None:
+    """A pipeline with no sources should still validate pure SQL."""
+    pipeline = _create_pipeline(client)
+    pid = pipeline["id"]
+
+    resp = client.post(
+        f"/api/pipelines/{pid}/validate-query",
+        json={"query": "SELECT 1 AS result"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["valid"] is True
+
+
+def test_validate_query_pipeline_not_found(client: TestClient) -> None:
+    resp = client.post(
+        "/api/pipelines/nonexistent/validate-query",
+        json={"query": "SELECT 1"},
+    )
+    assert resp.status_code == 404
