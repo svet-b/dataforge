@@ -12,8 +12,7 @@
 		selectSource,
 	} from '$lib/stores/sourcePreview.js';
 	import { api } from '$lib/api/client.js';
-	import DataTable from './DataTable.svelte';
-	import ResultsChart from './ResultsChart.svelte';
+	import DataViewer from './DataViewer.svelte';
 
 	let {
 		pipelineId,
@@ -43,12 +42,6 @@
 		return api.download.url(pipelineId, runId, format);
 	}
 
-	function formatCell(value: unknown): string {
-		if (value == null) return '';
-		if (typeof value === 'object') return JSON.stringify(value);
-		return String(value);
-	}
-
 	// Source preview: selected source data
 	let selectedSourceData = $derived(
 		$sourcePreviewStore.sources.find((s) => s.name === $sourcePreviewStore.selectedSource) ?? null
@@ -75,32 +68,6 @@
 			loadCteInspection(pipelineId, $resultsStore.runId);
 		}
 	});
-
-	// --- Vertical split divider for results tab ---
-	let splitPercent = $state(55); // table gets 55% by default
-	let isDraggingSplit = $state(false);
-	let splitContainerEl: HTMLDivElement | undefined = $state();
-
-	function onSplitMouseDown(e: MouseEvent) {
-		e.preventDefault();
-		isDraggingSplit = true;
-
-		function onMouseMove(e: MouseEvent) {
-			if (!splitContainerEl) return;
-			const rect = splitContainerEl.getBoundingClientRect();
-			const pct = ((e.clientY - rect.top) / rect.height) * 100;
-			splitPercent = Math.max(15, Math.min(85, pct));
-		}
-
-		function onMouseUp() {
-			isDraggingSplit = false;
-			window.removeEventListener('mousemove', onMouseMove);
-			window.removeEventListener('mouseup', onMouseUp);
-		}
-
-		window.addEventListener('mousemove', onMouseMove);
-		window.addEventListener('mouseup', onMouseUp);
-	}
 </script>
 
 <div class="flex h-full flex-col">
@@ -145,7 +112,7 @@
 	</div>
 
 	<!-- Content -->
-	<div class="flex flex-1 flex-col overflow-hidden {activeTab !== 'results' ? 'overflow-y-auto' : ''}">
+	<div class="flex flex-1 flex-col overflow-hidden {activeTab === 'history' ? 'overflow-y-auto' : ''}">
 		{#if activeTab === 'inputs'}
 			<!-- Source Inputs -->
 			{#if $sourcePreviewStore.loading}
@@ -164,10 +131,10 @@
 				</div>
 			{:else}
 				<!-- Source selector pills -->
-				<div class="sticky top-0 z-20 flex items-center gap-1.5 border-b border-gray-200 bg-white px-3 py-1.5">
+				<div class="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-gray-200 bg-white px-3 py-1.5">
 					{#each $sourcePreviewStore.sources as src}
 						<button
-							class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors {$sourcePreviewStore.selectedSource === src.name
+							class="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors {$sourcePreviewStore.selectedSource === src.name
 								? 'bg-blue-100 text-blue-700'
 								: 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
 							onclick={() => selectSource(src.name)}
@@ -177,37 +144,17 @@
 						</button>
 					{/each}
 					{#if $sourcePreviewStore.durationMs != null}
-						<span class="ml-auto text-xs text-gray-400">{$sourcePreviewStore.durationMs}ms</span>
+						<span class="ml-auto shrink-0 text-xs text-gray-400">{$sourcePreviewStore.durationMs}ms</span>
 					{/if}
 				</div>
-				<!-- Source data table -->
+				<!-- Source data viewer -->
 				{#if selectedSourceData}
 					{#if selectedSourceData.error}
 						<div class="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{selectedSourceData.error}</div>
 					{:else}
-						<table class="w-full border-collapse font-mono text-xs">
-							<thead>
-								<tr class="sticky top-[33px] z-10 bg-gray-50">
-									{#each selectedSourceData.schema_info as col}
-										<th class="border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold">
-											<span class="text-gray-800">{col.name}</span>
-											<span class="ml-1 text-gray-400">{col.type}</span>
-										</th>
-									{/each}
-								</tr>
-							</thead>
-							<tbody>
-								{#each selectedSourceData.data as row, i}
-									<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-										{#each selectedSourceData.schema_info as col}
-											<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
-												{formatCell(row[col.name])}
-											</td>
-										{/each}
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+						{#key $sourcePreviewStore.selectedSource}
+							<DataViewer data={selectedSourceData.data} schema={selectedSourceData.schema_info} />
+						{/key}
 					{/if}
 				{/if}
 			{/if}
@@ -229,10 +176,10 @@
 				</div>
 			{:else}
 				<!-- CTE selector pills -->
-				<div class="sticky top-0 z-20 flex items-center gap-1.5 border-b border-gray-200 bg-white px-3 py-1.5">
+				<div class="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-gray-200 bg-white px-3 py-1.5">
 					{#each $cteInspectionStore.ctes as cte}
 						<button
-							class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors {$cteInspectionStore.selectedCte === cte.name
+							class="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors {$cteInspectionStore.selectedCte === cte.name
 								? 'bg-blue-100 text-blue-700'
 								: 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
 							onclick={() => selectCte(cte.name)}
@@ -242,38 +189,18 @@
 						</button>
 					{/each}
 					{#if $cteInspectionStore.durationMs != null}
-						<span class="ml-auto text-xs text-gray-400">{$cteInspectionStore.durationMs}ms</span>
+						<span class="ml-auto shrink-0 text-xs text-gray-400">{$cteInspectionStore.durationMs}ms</span>
 					{/if}
 				</div>
-				<!-- CTE data table -->
+				<!-- CTE data viewer -->
 				{#if selectedCteData}
-					<table class="w-full border-collapse font-mono text-xs">
-						<thead>
-							<tr class="sticky top-[33px] z-10 bg-gray-50">
-								{#each selectedCteData.schema_info as col}
-									<th class="border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold">
-										<span class="text-gray-800">{col.name}</span>
-										<span class="ml-1 text-gray-400">{col.type}</span>
-									</th>
-								{/each}
-							</tr>
-						</thead>
-						<tbody>
-							{#each selectedCteData.data as row, i}
-								<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-									{#each selectedCteData.schema_info as col}
-										<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
-											{formatCell(row[col.name])}
-										</td>
-									{/each}
-								</tr>
-							{/each}
-						</tbody>
-					</table>
+					{#key $cteInspectionStore.selectedCte}
+						<DataViewer data={selectedCteData.data} schema={selectedCteData.schema_info} />
+					{/key}
 				{/if}
 			{/if}
 		{:else if activeTab === 'results'}
-			<!-- Results: split into table (top) and chart (bottom) -->
+			<!-- Results -->
 			{#if $resultsStore.loading}
 				<div class="flex h-full items-center justify-center text-sm text-gray-500">
 					<svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -289,59 +216,34 @@
 					No results yet. Click Run to execute the pipeline.
 				</div>
 			{:else}
-				<div
-					class="flex min-h-0 flex-1 flex-col"
-					bind:this={splitContainerEl}
-					class:select-none={isDraggingSplit}
-				>
-					<!-- Top: Data table -->
-					<div class="flex flex-col overflow-hidden" style="height: {splitPercent}%;">
-						<div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3 py-1">
-							<span class="text-xs text-gray-500">
-								Showing {$resultsStore.data.length} of {$resultsStore.rowCount ?? $resultsStore.data.length} rows
-								{#if $resultsStore.durationMs != null}
-									&middot; {$resultsStore.durationMs}ms
-								{/if}
-							</span>
-							{#if $resultsStore.runId}
-								<div class="flex gap-1.5" data-testid="download-buttons">
-									<a
-										href={downloadUrl($resultsStore.runId, 'csv')}
-										class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
-										download
-									>
-										CSV
-									</a>
-									<a
-										href={downloadUrl($resultsStore.runId, 'json')}
-										class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
-										download
-									>
-										JSON
-									</a>
-								</div>
-							{/if}
+				<!-- Results header bar -->
+				<div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3 py-1">
+					<span class="text-xs text-gray-500">
+						Showing {$resultsStore.data.length} of {$resultsStore.rowCount ?? $resultsStore.data.length} rows
+						{#if $resultsStore.durationMs != null}
+							&middot; {$resultsStore.durationMs}ms
+						{/if}
+					</span>
+					{#if $resultsStore.runId}
+						<div class="flex gap-1.5" data-testid="download-buttons">
+							<a
+								href={downloadUrl($resultsStore.runId, 'csv')}
+								class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+								download
+							>
+								CSV
+							</a>
+							<a
+								href={downloadUrl($resultsStore.runId, 'json')}
+								class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+								download
+							>
+								JSON
+							</a>
 						</div>
-						<div class="min-h-0 flex-1">
-							<DataTable data={$resultsStore.data} schema={$resultsStore.schema} />
-						</div>
-					</div>
-
-					<!-- Drag handle -->
-					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-					<div
-						class="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center border-y border-gray-200 bg-gray-100 hover:bg-gray-200 transition-colors"
-						onmousedown={onSplitMouseDown}
-						role="separator"
-					>
-						<div class="h-0.5 w-8 rounded-full bg-gray-400"></div>
-					</div>
-
-					<!-- Bottom: Chart -->
-					<div class="flex flex-col overflow-hidden" style="height: {100 - splitPercent}%;">
-						<ResultsChart data={$resultsStore.data} schema={$resultsStore.schema} />
-					</div>
+					{/if}
 				</div>
+				<DataViewer data={$resultsStore.data} schema={$resultsStore.schema} />
 			{/if}
 		{:else if activeTab === 'history'}
 			<!-- Run History -->

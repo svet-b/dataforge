@@ -27,13 +27,25 @@
 		return NUMERIC_TYPE_RE.test(type);
 	}
 
-	/** Determine the maximum decimal places actually present in a column's data. */
+	const MAX_SIG_FIGS = 10;
+
+	/** Round a number to MAX_SIG_FIGS significant figures to remove floating-point noise. */
+	function roundToSigFigs(v: number): number {
+		if (v === 0) return 0;
+		const magnitude = Math.floor(Math.log10(Math.abs(v))) + 1;
+		const decimals = Math.max(0, MAX_SIG_FIGS - magnitude);
+		return parseFloat(v.toFixed(decimals));
+	}
+
+	/** Determine the maximum decimal places actually present in a column's data,
+	 *  after rounding each value to MAX_SIG_FIGS significant figures. */
 	function getColumnPrecision(colName: string, rows: RowData[]): number {
 		let maxDecimals = 0;
 		for (const row of rows) {
 			const v = row[colName];
 			if (typeof v === 'number' && isFinite(v)) {
-				const s = String(v);
+				const rounded = roundToSigFigs(v);
+				const s = String(rounded);
 				const dot = s.indexOf('.');
 				if (dot !== -1) {
 					maxDecimals = Math.max(maxDecimals, s.length - dot - 1);
@@ -59,7 +71,7 @@
 		if (typeof value === 'number') {
 			const precision = precisionMap.get(colName);
 			if (precision !== undefined) {
-				return value.toFixed(precision);
+				return roundToSigFigs(value).toFixed(precision);
 			}
 			return String(value);
 		}
@@ -76,8 +88,8 @@
 		const MIN_WIDTH = 60;
 		const MAX_WIDTH = 400;
 
-		// Header width: name + type
-		let maxLen = colName.length + colType.length + 2;
+		// Header width: name and type are on separate lines, use the wider one
+		let maxLen = Math.max(colName.length, colType.length);
 
 		// Sample first 50 rows for width estimation
 		const sample = rows.slice(0, 50);
@@ -133,9 +145,46 @@
 		enableSorting: true,
 	});
 
-	// --- Resize state ---
+	// --- Reactive bridges to TanStack table ---
+	// TanStack table methods live on a plain object — Svelte can't track when their
+	// return values change. These $derived values read the reactive $state variables
+	// (sorting, columnSizing) to establish dependencies, then delegate to the table
+	// methods so the template re-renders when table state changes.
 
-	let isResizing = $derived(table.getState().columnSizingInfo.isResizingColumn !== false);
+	let headerGroups = $derived.by(() => {
+		void sorting;
+		void columnSizing;
+		return table.getHeaderGroups();
+	});
+
+	let rows = $derived.by(() => {
+		void sorting;
+		void columnSizing;
+		return table.getRowModel().rows;
+	});
+
+	let centerTotalSize = $derived.by(() => {
+		void columnSizing;
+		return table.getCenterTotalSize();
+	});
+
+	let colSizeMap = $derived.by(() => {
+		void columnSizing;
+		const map: Record<string, number> = {};
+		for (const col of table.getAllColumns()) {
+			map[col.id] = col.getSize();
+		}
+		return map;
+	});
+
+	let sortMap = $derived.by(() => {
+		void sorting;
+		const map: Record<string, false | 'asc' | 'desc'> = {};
+		for (const col of table.getAllColumns()) {
+			map[col.id] = col.getIsSorted();
+		}
+		return map;
+	});
 </script>
 
 <div class="datatable-wrapper flex flex-col overflow-hidden" style="height: 100%;">
@@ -143,28 +192,30 @@
 	<div class="flex-1 overflow-auto" style="min-height: 0;">
 		<table
 			class="border-collapse font-mono text-xs"
-			style="width: {table.getCenterTotalSize()}px; min-width: 100%;"
+			style="table-layout: fixed; width: {centerTotalSize}px; min-width: 100%;"
 		>
 			<thead>
-				{#each table.getHeaderGroups() as headerGroup}
+				{#each headerGroups as headerGroup}
 					<tr class="sticky top-0 z-10 bg-gray-50">
 						{#each headerGroup.headers as header}
-							{@const sorted = header.column.getIsSorted()}
+							{@const sorted = sortMap[header.column.id]}
 							{@const meta = header.column.columnDef.meta as { type: string; numeric: boolean } | undefined}
 							<th
 								class="relative select-none border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold
 									{header.column.getCanSort() ? 'cursor-pointer hover:bg-gray-100' : ''}"
-								style="width: {header.getSize()}px;"
+								style="width: {colSizeMap[header.column.id]}px;"
 								onclick={header.column.getToggleSortingHandler()}
 							>
-								<span class="text-gray-800">{header.column.columnDef.id}</span>
+								<div class="flex items-baseline gap-1">
+									<span class="text-gray-800">{header.column.columnDef.id}</span>
+									{#if sorted === 'asc'}
+										<span class="ml-0.5">&#9650;</span>
+									{:else if sorted === 'desc'}
+										<span class="ml-0.5">&#9660;</span>
+									{/if}
+								</div>
 								{#if meta}
-									<span class="ml-1 text-gray-400">{meta.type}</span>
-								{/if}
-								{#if sorted === 'asc'}
-									<span class="ml-0.5">&#9650;</span>
-								{:else if sorted === 'desc'}
-									<span class="ml-0.5">&#9660;</span>
+									<div class="text-[10px] font-normal text-gray-400">{meta.type}</div>
 								{/if}
 
 								<!-- Resize handle -->
@@ -184,16 +235,16 @@
 				{/each}
 			</thead>
 			<tbody>
-				{#each table.getRowModel().rows as row, i}
+				{#each rows as row, i}
 					<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
 						{#each row.getVisibleCells() as cell}
 							{@const meta = cell.column.columnDef.meta as { type: string; numeric: boolean } | undefined}
 							<td
 								class="border-r border-gray-100 px-2 py-1 text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis
 									{meta?.numeric ? 'text-right tabular-nums' : ''}"
-								style="width: {cell.column.getSize()}px; max-width: {cell.column.getSize()}px;"
+								style="width: {colSizeMap[cell.column.id]}px; max-width: {colSizeMap[cell.column.id]}px;"
 							>
-								{cell.renderValue() as string}
+								{formatCell(cell.getValue(), cell.column.id)}
 							</td>
 						{/each}
 					</tr>
