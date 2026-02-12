@@ -28,6 +28,7 @@
 	let chatContainer: HTMLDivElement | undefined = $state();
 
 	let parameters = $derived($pipelineStore.pipeline?.parameters ?? []);
+	let currentQuery = $derived($pipelineStore.pipeline?.query ?? null);
 
 	onMount(async () => {
 		try {
@@ -82,12 +83,13 @@
 				prompt,
 				available_tables: schemas,
 				pipeline_parameters: parameters as PipelineParameter[],
-				conversation_history: history.length > 0 ? history : []
+				conversation_history: history.length > 0 ? history : [],
+				current_query: currentQuery
 			});
 
 			messages = [
 				...messages,
-				{ role: 'assistant', content: result.explanation || 'SQL generated.', sql: result.sql }
+				{ role: 'assistant', content: result.explanation || 'Query updated.', sql: result.sql }
 			];
 
 			onSqlGenerated(result.sql);
@@ -150,13 +152,6 @@
 						</div>
 					{:else}
 						<div class="max-w-[85%]">
-							{#if msg.sql}
-								<div
-									class="mb-1 overflow-x-auto rounded bg-gray-900 p-2 text-xs text-green-400"
-								>
-									<pre class="whitespace-pre-wrap">{msg.sql}</pre>
-								</div>
-							{/if}
 							<p class="text-sm text-gray-600">{msg.content}</p>
 						</div>
 					{/if}

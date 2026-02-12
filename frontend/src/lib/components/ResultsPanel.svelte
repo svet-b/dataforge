@@ -12,6 +12,8 @@
 		selectSource,
 	} from '$lib/stores/sourcePreview.js';
 	import { api } from '$lib/api/client.js';
+	import DataTable from './DataTable.svelte';
+	import ResultsChart from './ResultsChart.svelte';
 
 	let {
 		pipelineId,
@@ -20,33 +22,6 @@
 		pipelineId: string;
 		activeTab: string;
 	} = $props();
-
-	let sortCol = $state<string | null>(null);
-	let sortDir = $state<'asc' | 'desc'>('asc');
-
-	function toggleSort(col: string) {
-		if (sortCol === col) {
-			sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-		} else {
-			sortCol = col;
-			sortDir = 'asc';
-		}
-	}
-
-	let sortedData = $derived.by(() => {
-		const data = $resultsStore.data;
-		if (!sortCol || data.length === 0) return data;
-		const col = sortCol;
-		const dir = sortDir === 'asc' ? 1 : -1;
-		return [...data].sort((a, b) => {
-			const av = a[col], bv = b[col];
-			if (av == null && bv == null) return 0;
-			if (av == null) return dir;
-			if (bv == null) return -dir;
-			if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
-			return String(av).localeCompare(String(bv)) * dir;
-		});
-	});
 
 	// Run history
 	let expandedRunId = $state<string | null>(null);
@@ -100,6 +75,32 @@
 			loadCteInspection(pipelineId, $resultsStore.runId);
 		}
 	});
+
+	// --- Vertical split divider for results tab ---
+	let splitPercent = $state(55); // table gets 55% by default
+	let isDraggingSplit = $state(false);
+	let splitContainerEl: HTMLDivElement | undefined = $state();
+
+	function onSplitMouseDown(e: MouseEvent) {
+		e.preventDefault();
+		isDraggingSplit = true;
+
+		function onMouseMove(e: MouseEvent) {
+			if (!splitContainerEl) return;
+			const rect = splitContainerEl.getBoundingClientRect();
+			const pct = ((e.clientY - rect.top) / rect.height) * 100;
+			splitPercent = Math.max(15, Math.min(85, pct));
+		}
+
+		function onMouseUp() {
+			isDraggingSplit = false;
+			window.removeEventListener('mousemove', onMouseMove);
+			window.removeEventListener('mouseup', onMouseUp);
+		}
+
+		window.addEventListener('mousemove', onMouseMove);
+		window.addEventListener('mouseup', onMouseUp);
+	}
 </script>
 
 <div class="flex h-full flex-col">
@@ -144,7 +145,7 @@
 	</div>
 
 	<!-- Content -->
-	<div class="flex-1 overflow-auto">
+	<div class="flex flex-1 flex-col overflow-hidden {activeTab !== 'results' ? 'overflow-y-auto' : ''}">
 		{#if activeTab === 'inputs'}
 			<!-- Source Inputs -->
 			{#if $sourcePreviewStore.loading}
@@ -272,7 +273,7 @@
 				{/if}
 			{/if}
 		{:else if activeTab === 'results'}
-			<!-- Results table -->
+			<!-- Results: split into table (top) and chart (bottom) -->
 			{#if $resultsStore.loading}
 				<div class="flex h-full items-center justify-center text-sm text-gray-500">
 					<svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -288,61 +289,59 @@
 					No results yet. Click Run to execute the pipeline.
 				</div>
 			{:else}
-				<div class="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-3 py-1">
-					<span class="text-xs text-gray-500">
-						Showing {sortedData.length} of {$resultsStore.rowCount ?? sortedData.length} rows
-						{#if $resultsStore.durationMs != null}
-							&middot; {$resultsStore.durationMs}ms
-						{/if}
-					</span>
-					{#if $resultsStore.runId}
-						<div class="flex gap-1.5" data-testid="download-buttons">
-							<a
-								href={downloadUrl($resultsStore.runId, 'csv')}
-								class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
-								download
-							>
-								CSV
-							</a>
-							<a
-								href={downloadUrl($resultsStore.runId, 'json')}
-								class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
-								download
-							>
-								JSON
-							</a>
+				<div
+					class="flex min-h-0 flex-1 flex-col"
+					bind:this={splitContainerEl}
+					class:select-none={isDraggingSplit}
+				>
+					<!-- Top: Data table -->
+					<div class="flex flex-col overflow-hidden" style="height: {splitPercent}%;">
+						<div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-3 py-1">
+							<span class="text-xs text-gray-500">
+								Showing {$resultsStore.data.length} of {$resultsStore.rowCount ?? $resultsStore.data.length} rows
+								{#if $resultsStore.durationMs != null}
+									&middot; {$resultsStore.durationMs}ms
+								{/if}
+							</span>
+							{#if $resultsStore.runId}
+								<div class="flex gap-1.5" data-testid="download-buttons">
+									<a
+										href={downloadUrl($resultsStore.runId, 'csv')}
+										class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+										download
+									>
+										CSV
+									</a>
+									<a
+										href={downloadUrl($resultsStore.runId, 'json')}
+										class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+										download
+									>
+										JSON
+									</a>
+								</div>
+							{/if}
 						</div>
-					{/if}
+						<div class="min-h-0 flex-1">
+							<DataTable data={$resultsStore.data} schema={$resultsStore.schema} />
+						</div>
+					</div>
+
+					<!-- Drag handle -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+					<div
+						class="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center border-y border-gray-200 bg-gray-100 hover:bg-gray-200 transition-colors"
+						onmousedown={onSplitMouseDown}
+						role="separator"
+					>
+						<div class="h-0.5 w-8 rounded-full bg-gray-400"></div>
+					</div>
+
+					<!-- Bottom: Chart -->
+					<div class="flex flex-col overflow-hidden" style="height: {100 - splitPercent}%;">
+						<ResultsChart data={$resultsStore.data} schema={$resultsStore.schema} />
+					</div>
 				</div>
-				<table class="w-full border-collapse font-mono text-xs">
-					<thead>
-						<tr class="sticky top-[25px] z-10 bg-gray-50">
-							{#each $resultsStore.schema as col}
-								<th
-									class="cursor-pointer border-b border-r border-gray-200 px-2 py-1.5 text-left font-semibold hover:bg-gray-100"
-									onclick={() => toggleSort(col.name)}
-								>
-									<span class="text-gray-800">{col.name}</span>
-									<span class="ml-1 text-gray-400">{col.type}</span>
-									{#if sortCol === col.name}
-										<span class="ml-0.5">{sortDir === 'asc' ? '\u25B2' : '\u25BC'}</span>
-									{/if}
-								</th>
-							{/each}
-						</tr>
-					</thead>
-					<tbody>
-						{#each sortedData as row, i}
-							<tr class={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-								{#each $resultsStore.schema as col}
-									<td class="border-r border-gray-100 px-2 py-1 text-gray-700">
-										{formatCell(row[col.name])}
-									</td>
-								{/each}
-							</tr>
-						{/each}
-					</tbody>
-				</table>
 			{/if}
 		{:else if activeTab === 'history'}
 			<!-- Run History -->

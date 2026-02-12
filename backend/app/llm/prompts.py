@@ -90,11 +90,17 @@ Do not include anything else in your response.
 
 ## Pipeline Parameters
 
-{parameter_description}"""
+{parameter_description}
+
+## Current Query
+
+{current_query_description}"""
 
 
 def build_system_prompt(
-    tables: list[dict[str, object]], parameters: list[dict[str, object]]
+    tables: list[dict[str, object]],
+    parameters: list[dict[str, object]],
+    current_query: str | None = None,
 ) -> str:
     """Build the complete system prompt with schema and parameter context."""
     schema_lines: list[str] = []
@@ -111,8 +117,20 @@ def build_system_prompt(
         param_lines.append(f"- getvariable('{p['name']}') ({p['type']}){desc}")
     parameter_description = "\n".join(param_lines) if param_lines else "No parameters defined."
 
-    return DUCKDB_SQL_SYSTEM_PROMPT.replace("{schema_description}", schema_description).replace(
-        "{parameter_description}", parameter_description
+    if current_query and current_query.strip():
+        current_query_description = (
+            "The user's current SQL query is shown below. When the user asks to modify "
+            "the query (e.g., \"add a WHERE clause\", \"sort by date\"), use this as the "
+            "starting point and return the FULL modified query.\n\n"
+            f"```sql\n{current_query.strip()}\n```"
+        )
+    else:
+        current_query_description = "No query written yet. Generate a new query from scratch."
+
+    return (
+        DUCKDB_SQL_SYSTEM_PROMPT.replace("{schema_description}", schema_description)
+        .replace("{parameter_description}", parameter_description)
+        .replace("{current_query_description}", current_query_description)
     )
 
 

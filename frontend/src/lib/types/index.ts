@@ -123,6 +123,7 @@ export interface GenerateSQLRequest {
 	available_tables: TableSchema[];
 	pipeline_parameters: PipelineParameter[];
 	conversation_history: { role: string; content: string }[];
+	current_query?: string | null;
 }
 
 export interface GenerateSQLResponse {
