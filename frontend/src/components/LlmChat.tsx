@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 
+const MAX_VALIDATION_RETRIES = 2;
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -22,6 +24,7 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('Generating SQL...');
   const [error, setError] = useState('');
   const [schemas, setSchemas] = useState<TableSchema[]>([]);
   const [schemasLoaded, setSchemasLoaded] = useState(false);
@@ -66,6 +69,13 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
     });
   }
 
+  function buildHistory(msgs: ChatMessage[]) {
+    return msgs.map((m) => ({
+      role: m.role,
+      content: m.role === 'assistant' && m.sql ? `\`\`\`sql\n${m.sql}\n\`\`\`\n\nExplanation: ${m.content}` : m.content,
+    }));
+  }
+
   async function sendMessage() {
     const prompt = inputValue.trim();
     if (!prompt || loading) return;
@@ -77,13 +87,11 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
     const newMessages: ChatMessage[] = [...messages, { role: 'user', content: prompt }];
     setMessages(newMessages);
     setLoading(true);
+    setLoadingText('Generating SQL...');
     scrollToBottom();
 
     try {
-      const history = newMessages.slice(0, -1).map((m) => ({
-        role: m.role,
-        content: m.role === 'assistant' && m.sql ? `\`\`\`sql\n${m.sql}\n\`\`\`\n\nExplanation: ${m.content}` : m.content,
-      }));
+      const history = buildHistory(newMessages.slice(0, -1));
 
       const result = await api.llm.generateSql({
         prompt,
@@ -93,12 +101,27 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
         current_query: currentQuery,
       });
 
+      let finalSql = result.sql;
+      let finalExplanation = result.explanation || 'Query updated.';
+
+      // Validate the generated SQL and auto-retry if it has errors
+      const validated = await validateAndRetry(
+        finalSql,
+        finalExplanation,
+        newMessages,
+        schemas,
+        parameters as PipelineParameter[],
+        currentQuery,
+      );
+      finalSql = validated.sql;
+      finalExplanation = validated.explanation;
+
       setMessages([
         ...newMessages,
-        { role: 'assistant', content: result.explanation || 'Query updated.', sql: result.sql },
+        { role: 'assistant', content: finalExplanation, sql: finalSql },
       ]);
 
-      onSqlGenerated(result.sql);
+      onSqlGenerated(finalSql);
     } catch (e) {
       if (e instanceof ApiError) {
         setError(e.detail);
@@ -109,6 +132,60 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
       setLoading(false);
       scrollToBottom();
     }
+  }
+
+  async function validateAndRetry(
+    sql: string,
+    explanation: string,
+    conversationMessages: ChatMessage[],
+    availableTables: TableSchema[],
+    pipelineParams: PipelineParameter[],
+    query: string | null,
+  ): Promise<{ sql: string; explanation: string }> {
+    for (let attempt = 0; attempt < MAX_VALIDATION_RETRIES; attempt++) {
+      setLoadingText('Validating query...');
+      scrollToBottom();
+
+      let validation;
+      try {
+        validation = await api.execution.validateQuery(pipelineId, sql);
+      } catch {
+        // If validation endpoint itself fails, accept the query as-is
+        return { sql, explanation };
+      }
+
+      if (validation.valid) {
+        return { sql, explanation };
+      }
+
+      // Query is invalid — ask the LLM to fix it
+      setLoadingText(`Query error detected, asking AI to fix (attempt ${attempt + 1}/${MAX_VALIDATION_RETRIES})...`);
+      scrollToBottom();
+
+      const retryHistory = buildHistory([
+        ...conversationMessages,
+        { role: 'assistant', content: explanation, sql },
+      ]);
+
+      const fixPrompt =
+        `The query you generated has an error when validated against the data sources:\n\n` +
+        `Error: ${validation.error}\n\n` +
+        `Please fix the query and return the corrected full SQL.`;
+
+      const retryResult = await api.llm.generateSql({
+        prompt: fixPrompt,
+        available_tables: availableTables,
+        pipeline_parameters: pipelineParams,
+        conversation_history: retryHistory,
+        current_query: query,
+      });
+
+      sql = retryResult.sql;
+      explanation = retryResult.explanation || 'Query corrected.';
+    }
+
+    // After max retries, accept whatever we have
+    return { sql, explanation };
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -161,7 +238,7 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
               <div className="mb-3">
                 <div className="flex items-center gap-2 text-sm text-gray-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating SQL...
+                  {loadingText}
                 </div>
               </div>
             )}

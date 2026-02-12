@@ -18,6 +18,7 @@ import type {
   CTEInspectionResponse,
   SourcePreviewResponse,
   SourceSchemaResponse,
+  ValidateQueryResponse,
 } from '@/types';
 
 export class ApiError extends Error {
@@ -108,6 +109,12 @@ export const api = {
       request<SourcePreviewResponse>(
         'POST',
         `/api/pipelines/${pipelineId}/preview-sources`,
+      ),
+    validateQuery: (pipelineId: string, query: string) =>
+      request<ValidateQueryResponse>(
+        'POST',
+        `/api/pipelines/${pipelineId}/validate-query`,
+        { query },
       ),
   },
   files: {

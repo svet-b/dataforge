@@ -159,6 +159,13 @@ export interface SourceSchemaResponse {
   row_count: number;
 }
 
+// Query validation types
+
+export interface ValidateQueryResponse {
+  valid: boolean;
+  error: string | null;
+}
+
 // CTE Inspection types
 
 export interface CTEResult {

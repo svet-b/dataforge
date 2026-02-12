@@ -50,3 +50,12 @@ class CTEInspectionResponse(BaseModel):
 class SourceSchemaResponse(BaseModel):
     columns: list[dict[str, str]]
     row_count: int
+
+
+class ValidateQueryRequest(BaseModel):
+    query: str
+
+
+class ValidateQueryResponse(BaseModel):
+    valid: bool
+    error: str | None = None
