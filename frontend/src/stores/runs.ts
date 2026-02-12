@@ -1,0 +1,42 @@
+import { create } from 'zustand';
+import type { RunHistorySummary, RunHistoryDetail } from '@/types';
+import { api, ApiError } from '@/api/client';
+
+interface RunsState {
+  runs: RunHistorySummary[];
+  expandedRun: RunHistoryDetail | null;
+  loading: boolean;
+  loadRuns: (pipelineId: string) => Promise<void>;
+  loadRunDetail: (pipelineId: string, runId: string) => Promise<void>;
+  reset: () => void;
+}
+
+export const useRunsStore = create<RunsState>((set) => ({
+  runs: [],
+  expandedRun: null,
+  loading: false,
+
+  loadRuns: async (pipelineId) => {
+    set({ loading: true });
+    try {
+      const runs = await api.runs.list(pipelineId);
+      set({ runs, expandedRun: null, loading: false });
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.detail : e instanceof Error ? e.message : String(e);
+      console.error('Failed to load runs:', msg);
+      set({ loading: false });
+    }
+  },
+
+  loadRunDetail: async (pipelineId, runId) => {
+    try {
+      const detail = await api.runs.get(pipelineId, runId);
+      set({ expandedRun: detail });
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.detail : e instanceof Error ? e.message : String(e);
+      console.error('Failed to load run detail:', msg);
+    }
+  },
+
+  reset: () => set({ runs: [], expandedRun: null, loading: false }),
+}));
