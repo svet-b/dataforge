@@ -41,7 +41,14 @@ Items are listed in priority order and should be addressed starting from 1.
 
 ---
 
-5. Save indicator
+5. AI agent improvements
+
+- I've found that sometimes the agent comes up with a query that is not performant. The agent should be prompted to create a performant query (or review a query they've generated to see whether it can be optimized).
+
+- Sometimes the agent comes up with a query that errors out. If there's a way to test the validity of the query (against the source data schema) without actually running it that would be perfect. Otherwise we may want to immediately run the query and prompt the agent to re-evaluate if it errors out.
+
+
+6. Save indicator
 
 Add a **Save button** in the top toolbar, positioned between "Parameters" and "Run". The button should:
 
@@ -49,10 +56,10 @@ Add a **Save button** in the top toolbar, positioned between "Parameters" and "R
 - Visually indicate when there are unsaved changes (e.g., change the button label/style to show a dot or "unsaved" state).
 - After a successful save, return to the default/clean state.
 
-6. Revision history and checkpoints
+7. Revision history and checkpoints
 
 It would be nice to be able to go back through revisions of not just the pipeline runs, but also the SQL query used - especially as the AI agent makes changes, and may lead to a need to restore a previous version. **skip this item until detailed requirements are established.**
 
-6. Naming
+8. Naming
 
 "Pipeline" is no longer the right name for the core concept and should be renamed. The replacement name is TBD — **skip this item until a decision is made.**
