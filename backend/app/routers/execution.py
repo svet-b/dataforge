@@ -25,6 +25,8 @@ from app.schemas.execution import (
     RunResponse,
     SourcePreviewResponse,
     SourceSchemaResponse,
+    ValidateQueryRequest,
+    ValidateQueryResponse,
 )
 
 router = APIRouter(prefix="/api/pipelines", tags=["execution"])
@@ -193,6 +195,37 @@ async def inspect_ctes(
         ],
         error=result.error,
     )
+
+
+@router.post("/{pipeline_id}/validate-query")
+async def validate_query(
+    pipeline_id: str,
+    body: ValidateQueryRequest,
+    db: Session = Depends(get_db),
+) -> ValidateQueryResponse:
+    """Validate a SQL query against the pipeline's sources without executing it."""
+    pipeline, sources, _query = _load_pipeline(pipeline_id, db)
+    parameters = _merge_parameters(pipeline, {})
+
+    from app.engine.duckdb_manager import DuckDBSession
+
+    executor = PipelineExecutor(settings)
+    session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
+    try:
+        for name, value in parameters.items():
+            session.set_variable(name, str(value))
+
+        for source in sources:
+            await executor._load_source(session, source, parameters)
+
+        error = session.validate_query(body.query)
+        if error is None:
+            return ValidateQueryResponse(valid=True)
+        return ValidateQueryResponse(valid=False, error=error)
+    except Exception as e:
+        return ValidateQueryResponse(valid=False, error=str(e))
+    finally:
+        session.close()
 
 
 @router.post("/{pipeline_id}/preview-sources")

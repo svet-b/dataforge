@@ -1,0 +1,112 @@
+import { useState } from 'react';
+import type { SourceType } from '@/types';
+import { usePipelineStore } from '@/stores/pipeline';
+import { deriveTableName } from '@/utils/tableName';
+import { X } from 'lucide-react';
+
+interface SourceListProps {
+  pipelineId: string;
+}
+
+export default function SourceList({ pipelineId }: SourceListProps) {
+  const pipeline = usePipelineStore((s) => s.pipeline);
+  const selectedSourceId = usePipelineStore((s) => s.selectedSourceId);
+  const addSource = usePipelineStore((s) => s.addSource);
+  const deleteSource = usePipelineStore((s) => s.deleteSource);
+  const selectSource = usePipelineStore((s) => s.selectSource);
+
+  const sources = pipeline?.sources ?? [];
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
+  function handleAdd(type: SourceType) {
+    const existingNames = sources.map((s) => s.table_name);
+    const prefix = type === 'file' ? 'file' : 'api';
+    const tableName = deriveTableName(prefix, existingNames);
+    addSource(pipelineId, type, tableName);
+    setShowAddMenu(false);
+  }
+
+  function handleDelete(e: React.MouseEvent, sourceId: string) {
+    e.stopPropagation();
+    deleteSource(pipelineId, sourceId);
+  }
+
+  function handleSelect(sourceId: string) {
+    selectSource(selectedSourceId === sourceId ? null : sourceId);
+  }
+
+  function typeIcon(type: string): string {
+    return type === 'api' ? '\u2601' : '\u{1F4C4}';
+  }
+
+  function typeLabel(type: string): string {
+    return type === 'api' ? 'API' : 'File';
+  }
+
+  return (
+    <div className="flex flex-col" data-testid="source-list">
+      <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inputs</h3>
+        <div className="relative">
+          <button
+            className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100"
+            onClick={() => setShowAddMenu(!showAddMenu)}
+            data-testid="add-source-btn"
+          >
+            + Add
+          </button>
+          {showAddMenu && (
+            <div className="absolute right-0 z-20 mt-1 w-36 rounded border border-gray-200 bg-white py-1 shadow-lg">
+              <button
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => handleAdd('file')}
+                data-testid="add-file-source"
+              >
+                <span>&#128196;</span> File Source
+              </button>
+              <button
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => handleAdd('api')}
+                data-testid="add-api-source"
+              >
+                <span>&#9729;</span> API Source
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="overflow-y-auto">
+        {sources.length === 0 ? (
+          <div className="px-3 py-6 text-center text-xs text-gray-400">
+            No input sources yet.<br />Click + Add to get started.
+          </div>
+        ) : (
+          sources.map((source) => (
+            <div
+              key={source.id}
+              className={`flex w-full cursor-pointer items-center gap-2 border-b border-gray-100 px-3 py-2 text-left transition-colors hover:bg-gray-50 ${
+                selectedSourceId === source.id ? 'bg-blue-50' : ''
+              }`}
+              onClick={() => handleSelect(source.id)}
+              data-testid="source-item"
+            >
+              <span className="text-base">{typeIcon(source.type)}</span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-gray-800">{source.table_name}</div>
+                <div className="text-xs text-gray-400">{typeLabel(source.type)}</div>
+              </div>
+              <button
+                className="shrink-0 rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500"
+                onClick={(e) => handleDelete(e, source.id)}
+                aria-label="Remove source"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

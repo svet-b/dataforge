@@ -82,5 +82,16 @@ class DuckDBSession:
         assert row is not None
         return row[0]  # type: ignore[no-any-return]
 
+    def validate_query(self, sql: str) -> str | None:
+        """Validate a SQL query using EXPLAIN without executing it.
+
+        Returns None on success, or an error message string on failure.
+        """
+        try:
+            self.conn.execute(f"EXPLAIN ({sql})")
+            return None
+        except duckdb.Error as e:
+            return str(e)
+
     def close(self) -> None:
         self.conn.close()
