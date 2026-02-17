@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useWorkflowStore } from '@/stores/workflow';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-
 interface ToolbarProps {
   workflowId: string;
   workflowName: string;
