@@ -80,7 +80,7 @@ export default function SourceList({ workflowId }: SourceListProps) {
 
       <div className="overflow-y-auto">
         {sources.length === 0 ? (
-          <div className="px-3 py-6 text-center text-xs text-gray-400">
+          <div className="px-3 py-6 text-center text-sm text-gray-400">
             No input sources yet.<br />Click + Add to get started.
           </div>
         ) : (
@@ -99,7 +99,7 @@ export default function SourceList({ workflowId }: SourceListProps) {
                 <div className="text-xs text-gray-400">{typeLabel(source.type)}</div>
               </div>
               <button
-                className="shrink-0 rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500"
+                className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
                 onClick={(e) => handleDelete(e, source.id)}
                 aria-label="Remove source"
               >

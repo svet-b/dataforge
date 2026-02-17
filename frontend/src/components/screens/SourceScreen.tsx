@@ -48,12 +48,12 @@ export default function SourceScreen({ workflowId }: SourceScreenProps) {
 
       {/* Divider */}
       <div
-        className="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-gray-100 hover:bg-gray-300"
+        className="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-gray-100 hover:bg-gray-200"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       >
-        <div className="h-8 w-0.5 rounded-full bg-gray-400" />
+        <div className="h-8 w-0.5 rounded-full bg-gray-300" />
       </div>
 
       {/* Right: Source preview */}

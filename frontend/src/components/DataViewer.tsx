@@ -48,11 +48,11 @@ export default function DataViewer({ data, schema }: DataViewerProps) {
 
       {/* Drag handle */}
       <div
-        className="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center border-y border-gray-200 bg-gray-100 transition-colors hover:bg-gray-200"
+        className="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center bg-gray-100 hover:bg-gray-200"
         onMouseDown={onMouseDown}
         role="separator"
       >
-        <div className="h-0.5 w-8 rounded-full bg-gray-400" />
+        <div className="h-0.5 w-8 rounded-full bg-gray-300" />
       </div>
 
       {/* Bottom: Chart */}

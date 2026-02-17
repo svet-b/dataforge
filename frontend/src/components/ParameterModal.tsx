@@ -79,7 +79,7 @@ export default function ParameterModal({ workflowId, parameters, open, onClose }
         </DialogHeader>
 
         {nameError && (
-          <div className="rounded bg-red-50 p-2 text-sm text-red-600">{nameError}</div>
+          <div className="rounded bg-red-50 p-3 text-sm text-red-600">{nameError}</div>
         )}
 
         <div className="max-h-80 space-y-2 overflow-y-auto">
@@ -94,7 +94,7 @@ export default function ParameterModal({ workflowId, parameters, open, onClose }
                 />
                 <div className="flex gap-1">
                   <select
-                    className="w-24 rounded border border-gray-300 px-1 py-1 text-xs focus:border-blue-500 focus:outline-none"
+                    className="w-24 rounded border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
                     value={row.type}
                     onChange={(e) => updateRow(i, 'type', e.target.value)}
                   >
@@ -117,7 +117,7 @@ export default function ParameterModal({ workflowId, parameters, open, onClose }
                 />
               </div>
               <button
-                className="mt-1 text-gray-400 hover:text-red-500"
+                className="mt-1 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
                 onClick={() => removeRow(i)}
                 aria-label="Remove parameter"
               >
@@ -127,7 +127,7 @@ export default function ParameterModal({ workflowId, parameters, open, onClose }
           ))}
         </div>
 
-        <button className="text-sm text-blue-600 hover:text-blue-700" onClick={addRow}>
+        <button className="text-xs font-medium text-blue-600 hover:text-blue-700" onClick={addRow}>
           + Add Parameter
         </button>
 

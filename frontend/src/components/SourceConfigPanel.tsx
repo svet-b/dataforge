@@ -315,11 +315,11 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
         {/* Schema display */}
         {schemaLoading ? (
           <div className="pt-1">
-            <p className="text-xs text-gray-400">Loading schema...</p>
+            <p className="text-xs text-gray-500">Loading schema...</p>
           </div>
         ) : schemaError ? (
           <div className="pt-1">
-            <p className="text-xs text-red-400">{schemaError}</p>
+            <p className="text-xs text-red-600">{schemaError}</p>
           </div>
         ) : schemaColumns.length > 0 ? (
           <div className="pt-1">

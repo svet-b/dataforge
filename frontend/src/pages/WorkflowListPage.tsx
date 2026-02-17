@@ -139,7 +139,7 @@ export default function WorkflowListPage() {
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <label htmlFor="workflow-name" className="mb-1 block text-sm font-medium text-gray-700">Name</label>
+              <label htmlFor="workflow-name" className="mb-1 block text-xs font-medium text-gray-600">Name</label>
               <Input
                 id="workflow-name"
                 ref={nameInputRef}
@@ -150,7 +150,7 @@ export default function WorkflowListPage() {
               />
             </div>
             <div>
-              <label htmlFor="workflow-desc" className="mb-1 block text-sm font-medium text-gray-700">Description (optional)</label>
+              <label htmlFor="workflow-desc" className="mb-1 block text-xs font-medium text-gray-600">Description (optional)</label>
               <Textarea
                 id="workflow-desc"
                 value={newDescription}

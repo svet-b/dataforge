@@ -48,7 +48,7 @@ export default function KeyValueEditor({
             onChange={(e) => updateEntry(i, 'value', e.target.value)}
           />
           <button
-            className="text-gray-400 hover:text-red-500"
+            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
             onClick={() => removeEntry(i)}
             aria-label="Remove entry"
           >
@@ -56,7 +56,7 @@ export default function KeyValueEditor({
           </button>
         </div>
       ))}
-      <button className="text-xs text-blue-600 hover:text-blue-700" onClick={addEntry}>
+      <button className="text-xs font-medium text-blue-600 hover:text-blue-700" onClick={addEntry}>
         + Add
       </button>
     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRunsStore } from '@/stores/runs';
 import { api } from '@/api/client';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Loader2 } from 'lucide-react';
 
 interface RunHistoryProps {
   workflowId: string;
@@ -40,6 +40,7 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-gray-500">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         Loading runs...
       </div>
     );
@@ -67,9 +68,9 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
               }`}
             />
             <span className="flex-1 text-gray-700">{formatTime(run.started_at)}</span>
-            <span className="text-xs text-gray-500">{run.duration_ms}ms</span>
+            <span className="text-xs text-gray-400">{run.duration_ms}ms</span>
             {run.row_count != null && (
-              <span className="text-xs text-gray-500">{run.row_count} rows</span>
+              <span className="text-xs text-gray-400">{run.row_count} rows</span>
             )}
             <ChevronDown
               className={`h-3.5 w-3.5 text-gray-400 transition-transform ${
@@ -81,10 +82,10 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
           {expandedRunId === run.id && expandedRun && (
             <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-3 text-xs">
               {expandedRun.error && (
-                <div className="mb-2 space-y-1 rounded bg-red-50 p-2 text-red-600">
+                <div className="mb-2 space-y-1 rounded bg-red-50 p-3 text-sm text-red-600">
                   <div>{expandedRun.error.message}</div>
                   {expandedRun.error.sql && (
-                    <pre className="mt-1 whitespace-pre-wrap rounded bg-red-100/50 p-1.5 font-mono text-red-700">
+                    <pre className="mt-1 whitespace-pre-wrap rounded bg-red-100/50 p-1.5 font-mono text-xs text-red-600">
                       {expandedRun.error.sql}
                     </pre>
                   )}

@@ -111,10 +111,10 @@ export default function AnalyzeScreen({ workflowId, onRun }: AnalyzeScreenProps)
 
         {/* Left vertical divider */}
         <div
-          className="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center bg-gray-100 hover:bg-gray-300"
+          className="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center bg-gray-100 hover:bg-gray-200"
           onPointerDown={(e) => onDragStart('vl', e)}
         >
-          <div className="h-0.5 w-8 rounded-full bg-gray-400" />
+          <div className="h-0.5 w-8 rounded-full bg-gray-300" />
         </div>
 
         {/* Bottom-left: SQL Editor */}
@@ -128,10 +128,10 @@ export default function AnalyzeScreen({ workflowId, onRun }: AnalyzeScreenProps)
 
       {/* Horizontal divider */}
       <div
-        className="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-gray-100 hover:bg-gray-300"
+        className="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-gray-100 hover:bg-gray-200"
         onPointerDown={(e) => onDragStart('h', e)}
       >
-        <div className="h-8 w-0.5 rounded-full bg-gray-400" />
+        <div className="h-8 w-0.5 rounded-full bg-gray-300" />
       </div>
 
       {/* Right column: Data tables + Chart */}
@@ -188,10 +188,10 @@ export default function AnalyzeScreen({ workflowId, onRun }: AnalyzeScreenProps)
 
         {/* Right vertical divider */}
         <div
-          className="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center bg-gray-100 hover:bg-gray-300"
+          className="flex h-1.5 shrink-0 cursor-row-resize items-center justify-center bg-gray-100 hover:bg-gray-200"
           onPointerDown={(e) => onDragStart('vr', e)}
         >
-          <div className="h-0.5 w-8 rounded-full bg-gray-400" />
+          <div className="h-0.5 w-8 rounded-full bg-gray-300" />
         </div>
 
         {/* Bottom-right: Chart */}

@@ -72,7 +72,7 @@ export default function RunDialog({ workflowId, parameters, open, onClose, onRun
           <div className="space-y-3">
             {parameters.map((param) => (
               <div key={param.name}>
-                <label htmlFor={`run-param-${param.name}`} className="mb-1 block text-sm font-medium text-gray-700">
+                <label htmlFor={`run-param-${param.name}`} className="mb-1 block text-xs font-medium text-gray-600">
                   {param.name}
                   {param.description && (
                     <span className="ml-1 font-normal text-gray-400">- {param.description}</span>
