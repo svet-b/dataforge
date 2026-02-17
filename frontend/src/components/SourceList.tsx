@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { SourceType } from '@/types';
 import { useWorkflowStore } from '@/stores/workflow';
 import { deriveTableName } from '@/utils/tableName';
-import { X } from 'lucide-react';
+import { FileSpreadsheet, Globe, X } from 'lucide-react';
 
 interface SourceListProps {
   workflowId: string;
@@ -35,8 +35,10 @@ export default function SourceList({ workflowId }: SourceListProps) {
     selectSource(selectedSourceId === sourceId ? null : sourceId);
   }
 
-  function typeIcon(type: string): string {
-    return type === 'api' ? '\u2601' : '\u{1F4C4}';
+  function TypeIcon({ type }: { type: string }) {
+    return type === 'api'
+      ? <Globe className="h-4 w-4 text-gray-500" />
+      : <FileSpreadsheet className="h-4 w-4 text-gray-500" />;
   }
 
   function typeLabel(type: string): string {
@@ -62,14 +64,14 @@ export default function SourceList({ workflowId }: SourceListProps) {
                 onClick={() => handleAdd('file')}
                 data-testid="add-file-source"
               >
-                <span>&#128196;</span> File Source
+                <FileSpreadsheet className="h-4 w-4 text-gray-500" /> File Source
               </button>
               <button
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
                 onClick={() => handleAdd('api')}
                 data-testid="add-api-source"
               >
-                <span>&#9729;</span> API Source
+                <Globe className="h-4 w-4 text-gray-500" /> API Source
               </button>
             </div>
           )}
@@ -91,7 +93,7 @@ export default function SourceList({ workflowId }: SourceListProps) {
               onClick={() => handleSelect(source.id)}
               data-testid="source-item"
             >
-              <span className="text-base">{typeIcon(source.type)}</span>
+              <TypeIcon type={source.type} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-gray-800">{source.table_name}</div>
                 <div className="text-xs text-gray-400">{typeLabel(source.type)}</div>
