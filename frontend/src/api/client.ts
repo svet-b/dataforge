@@ -1,9 +1,9 @@
 import type {
-  PipelineSummary,
-  PipelineResponse,
-  PipelineDetail,
-  PipelineCreate,
-  PipelineUpdate,
+  WorkflowSummary,
+  WorkflowResponse,
+  WorkflowDetail,
+  WorkflowCreate,
+  WorkflowUpdate,
   SourceResponse,
   SourceCreate,
   SourceUpdate,
@@ -70,80 +70,80 @@ async function requestFormData<T>(method: string, path: string, formData: FormDa
 }
 
 export const api = {
-  pipelines: {
-    list: () => request<PipelineSummary[]>('GET', '/api/pipelines'),
-    create: (data: PipelineCreate) =>
-      request<PipelineResponse>('POST', '/api/pipelines', data),
-    get: (id: string) => request<PipelineDetail>('GET', `/api/pipelines/${id}`),
-    update: (id: string, data: PipelineUpdate) =>
-      request<PipelineResponse>('PUT', `/api/pipelines/${id}`, data),
-    delete: (id: string) => request<void>('DELETE', `/api/pipelines/${id}`),
+  workflows: {
+    list: () => request<WorkflowSummary[]>('GET', '/api/workflows'),
+    create: (data: WorkflowCreate) =>
+      request<WorkflowResponse>('POST', '/api/workflows', data),
+    get: (id: string) => request<WorkflowDetail>('GET', `/api/workflows/${id}`),
+    update: (id: string, data: WorkflowUpdate) =>
+      request<WorkflowResponse>('PUT', `/api/workflows/${id}`, data),
+    delete: (id: string) => request<void>('DELETE', `/api/workflows/${id}`),
   },
   sources: {
-    create: (pipelineId: string, data: SourceCreate) =>
-      request<SourceResponse>('POST', `/api/pipelines/${pipelineId}/sources`, data),
-    update: (pipelineId: string, sourceId: string, data: SourceUpdate) =>
+    create: (workflowId: string, data: SourceCreate) =>
+      request<SourceResponse>('POST', `/api/workflows/${workflowId}/sources`, data),
+    update: (workflowId: string, sourceId: string, data: SourceUpdate) =>
       request<SourceResponse>(
         'PUT',
-        `/api/pipelines/${pipelineId}/sources/${sourceId}`,
+        `/api/workflows/${workflowId}/sources/${sourceId}`,
         data,
       ),
-    delete: (pipelineId: string, sourceId: string) =>
-      request<void>('DELETE', `/api/pipelines/${pipelineId}/sources/${sourceId}`),
-    schema: (pipelineId: string, sourceId: string) =>
+    delete: (workflowId: string, sourceId: string) =>
+      request<void>('DELETE', `/api/workflows/${workflowId}/sources/${sourceId}`),
+    schema: (workflowId: string, sourceId: string) =>
       request<SourceSchemaResponse>(
         'POST',
-        `/api/pipelines/${pipelineId}/sources/${sourceId}/schema`,
+        `/api/workflows/${workflowId}/sources/${sourceId}/schema`,
       ),
   },
   execution: {
-    run: (pipelineId: string, data: RunRequest = {}) =>
-      request<RunResponse>('POST', `/api/pipelines/${pipelineId}/run`, data),
-    inspectCtes: (pipelineId: string, data: RunRequest = {}) =>
+    run: (workflowId: string, data: RunRequest = {}) =>
+      request<RunResponse>('POST', `/api/workflows/${workflowId}/run`, data),
+    inspectCtes: (workflowId: string, data: RunRequest = {}) =>
       request<CTEInspectionResponse>(
         'POST',
-        `/api/pipelines/${pipelineId}/inspect-ctes`,
+        `/api/workflows/${workflowId}/inspect-ctes`,
         data,
       ),
-    previewSources: (pipelineId: string) =>
+    previewSources: (workflowId: string) =>
       request<SourcePreviewResponse>(
         'POST',
-        `/api/pipelines/${pipelineId}/preview-sources`,
+        `/api/workflows/${workflowId}/preview-sources`,
       ),
-    validateQuery: (pipelineId: string, query: string) =>
+    validateQuery: (workflowId: string, query: string) =>
       request<ValidateQueryResponse>(
         'POST',
-        `/api/pipelines/${pipelineId}/validate-query`,
+        `/api/workflows/${workflowId}/validate-query`,
         { query },
       ),
   },
   files: {
-    upload: (pipelineId: string, file: File) => {
+    upload: (workflowId: string, file: File) => {
       const fd = new FormData();
       fd.append('file', file);
       return requestFormData<UploadedFileResponse>(
         'POST',
-        `/api/pipelines/${pipelineId}/files`,
+        `/api/workflows/${workflowId}/files`,
         fd,
       );
     },
-    list: (pipelineId: string) =>
-      request<UploadedFileResponse[]>('GET', `/api/pipelines/${pipelineId}/files`),
-    delete: (pipelineId: string, fileId: string) =>
-      request<void>('DELETE', `/api/pipelines/${pipelineId}/files/${fileId}`),
+    list: (workflowId: string) =>
+      request<UploadedFileResponse[]>('GET', `/api/workflows/${workflowId}/files`),
+    delete: (workflowId: string, fileId: string) =>
+      request<void>('DELETE', `/api/workflows/${workflowId}/files/${fileId}`),
   },
   runs: {
-    list: (pipelineId: string, limit = 20) =>
+    list: (workflowId: string, limit = 20) =>
       request<RunHistorySummary[]>(
         'GET',
-        `/api/pipelines/${pipelineId}/runs?limit=${limit}`,
+        `/api/workflows/${workflowId}/runs?limit=${limit}`,
       ),
-    get: (pipelineId: string, runId: string) =>
-      request<RunHistoryDetail>('GET', `/api/pipelines/${pipelineId}/runs/${runId}`),
+    get: (workflowId: string, runId: string) =>
+      request<RunHistoryDetail>('GET', `/api/workflows/${workflowId}/runs/${runId}`),
   },
   download: {
-    url: (pipelineId: string, runId: string, format: 'csv' | 'json') =>
-      `/api/pipelines/${pipelineId}/runs/${runId}/download?format=${format}`,
+    url: (workflowId: string, runId: string, format: 'csv' | 'json') =>
+      `/api/workflows/${workflowId}/runs/${runId}/download?format=${format}`,
   },
   llm: {
     generateSql: (data: GenerateSQLRequest) =>

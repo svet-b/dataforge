@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '@/api/client';
-import { usePipelineStore } from '@/stores/pipeline';
-import type { TableSchema, PipelineParameter } from '@/types';
+import { useWorkflowStore } from '@/stores/workflow';
+import type { TableSchema, WorkflowParameter } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
@@ -15,12 +15,12 @@ interface ChatMessage {
 }
 
 interface LlmChatProps {
-  pipelineId: string;
+  workflowId: string;
   onSqlGenerated: (sql: string) => void;
 }
 
-export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
-  const pipeline = usePipelineStore((s) => s.pipeline);
+export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
+  const workflow = useWorkflowStore((s) => s.workflow);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,8 +31,8 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
   const [llmAvailable, setLlmAvailable] = useState(true);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const parameters = pipeline?.parameters ?? [];
-  const currentQuery = pipeline?.query ?? null;
+  const parameters = workflow?.parameters ?? [];
+  const currentQuery = workflow?.query ?? null;
 
   useEffect(() => {
     api.llm.status().then((status) => {
@@ -42,12 +42,12 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
 
   const loadSchemas = useCallback(async () => {
     if (schemasLoaded) return;
-    const sources = pipeline?.sources ?? [];
+    const sources = workflow?.sources ?? [];
     try {
       const results = await Promise.all(
         sources.map(async (s) => {
           try {
-            const schema = await api.sources.schema(pipelineId, s.id);
+            const schema = await api.sources.schema(workflowId, s.id);
             return { name: s.table_name, columns: schema.columns };
           } catch {
             return { name: s.table_name, columns: [] };
@@ -59,7 +59,7 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
     } catch {
       // schemas will remain empty; LLM can still generate SQL without them
     }
-  }, [schemasLoaded, pipeline?.sources, pipelineId]);
+  }, [schemasLoaded, workflow?.sources, workflowId]);
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
@@ -96,7 +96,7 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
       const result = await api.llm.generateSql({
         prompt,
         available_tables: schemas,
-        pipeline_parameters: parameters as PipelineParameter[],
+        workflow_parameters: parameters as WorkflowParameter[],
         conversation_history: history.length > 0 ? history : [],
         current_query: currentQuery,
       });
@@ -110,7 +110,7 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
         finalExplanation,
         newMessages,
         schemas,
-        parameters as PipelineParameter[],
+        parameters as WorkflowParameter[],
         currentQuery,
       );
       finalSql = validated.sql;
@@ -139,7 +139,7 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
     explanation: string,
     conversationMessages: ChatMessage[],
     availableTables: TableSchema[],
-    pipelineParams: PipelineParameter[],
+    workflowParams: WorkflowParameter[],
     query: string | null,
   ): Promise<{ sql: string; explanation: string }> {
     for (let attempt = 0; attempt < MAX_VALIDATION_RETRIES; attempt++) {
@@ -148,7 +148,7 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
 
       let validation;
       try {
-        validation = await api.execution.validateQuery(pipelineId, sql);
+        validation = await api.execution.validateQuery(workflowId, sql);
       } catch {
         // If validation endpoint itself fails, accept the query as-is
         return { sql, explanation };
@@ -167,15 +167,17 @@ export default function LlmChat({ pipelineId, onSqlGenerated }: LlmChatProps) {
         { role: 'assistant', content: explanation, sql },
       ]);
 
+      const tableNames = availableTables.map((t) => t.name).join(', ');
       const fixPrompt =
         `The query you generated has an error when validated against the data sources:\n\n` +
         `Error: ${validation.error}\n\n` +
+        `Available tables: ${tableNames}\n\n` +
         `Please fix the query and return the corrected full SQL.`;
 
       const retryResult = await api.llm.generateSql({
         prompt: fixPrompt,
         available_tables: availableTables,
-        pipeline_parameters: pipelineParams,
+        workflow_parameters: workflowParams,
         conversation_history: retryHistory,
         current_query: query,
       });

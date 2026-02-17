@@ -19,7 +19,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.create_table(
-        "pipelines",
+        "workflows",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
@@ -32,7 +32,7 @@ def upgrade() -> None:
     op.create_table(
         "nodes",
         sa.Column("id", sa.String(), nullable=False),
-        sa.Column("pipeline_id", sa.String(), nullable=False),
+        sa.Column("workflow_id", sa.String(), nullable=False),
         sa.Column("type", sa.Text(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("position_x", sa.Float(), nullable=False, server_default="0"),
@@ -40,39 +40,39 @@ def upgrade() -> None:
         sa.Column("config", sa.JSON(), nullable=False, server_default="{}"),
         sa.Column("output_table_name", sa.Text(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(["pipeline_id"], ["pipelines.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="CASCADE"),
     )
-    op.create_index("idx_nodes_pipeline", "nodes", ["pipeline_id"])
+    op.create_index("idx_nodes_workflow", "nodes", ["workflow_id"])
 
     op.create_table(
         "edges",
         sa.Column("id", sa.String(), nullable=False),
-        sa.Column("pipeline_id", sa.String(), nullable=False),
+        sa.Column("workflow_id", sa.String(), nullable=False),
         sa.Column("source_node_id", sa.String(), nullable=False),
         sa.Column("target_node_id", sa.String(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(["pipeline_id"], ["pipelines.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["source_node_id"], ["nodes.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["target_node_id"], ["nodes.id"], ondelete="CASCADE"),
     )
-    op.create_index("idx_edges_pipeline", "edges", ["pipeline_id"])
+    op.create_index("idx_edges_workflow", "edges", ["workflow_id"])
 
     op.create_table(
         "uploaded_files",
         sa.Column("id", sa.String(), nullable=False),
-        sa.Column("pipeline_id", sa.String(), nullable=False),
+        sa.Column("workflow_id", sa.String(), nullable=False),
         sa.Column("filename", sa.Text(), nullable=False),
         sa.Column("file_type", sa.Text(), nullable=False),
         sa.Column("storage_path", sa.Text(), nullable=False),
         sa.Column("uploaded_at", sa.String(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(["pipeline_id"], ["pipelines.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="CASCADE"),
     )
 
     op.create_table(
         "run_history",
         sa.Column("id", sa.String(), nullable=False),
-        sa.Column("pipeline_id", sa.String(), nullable=False),
+        sa.Column("workflow_id", sa.String(), nullable=False),
         sa.Column("parameters", sa.JSON(), nullable=False, server_default="{}"),
         sa.Column("status", sa.Text(), nullable=False),
         sa.Column("started_at", sa.String(), nullable=False),
@@ -83,10 +83,10 @@ def upgrade() -> None:
         sa.Column("error", sa.JSON(), nullable=True),
         sa.Column("node_timings", sa.JSON(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(["pipeline_id"], ["pipelines.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="CASCADE"),
     )
     op.create_index(
-        "idx_run_history_pipeline", "run_history", ["pipeline_id", sa.text("started_at DESC")]
+        "idx_run_history_workflow", "run_history", ["workflow_id", sa.text("started_at DESC")]
     )
 
 
@@ -95,4 +95,4 @@ def downgrade() -> None:
     op.drop_table("uploaded_files")
     op.drop_table("edges")
     op.drop_table("nodes")
-    op.drop_table("pipelines")
+    op.drop_table("workflows")

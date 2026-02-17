@@ -9,7 +9,7 @@ interface SourcePreviewState {
   error: string | null;
   durationMs: number | null;
   cached: boolean;
-  loadSourcePreview: (pipelineId: string) => Promise<void>;
+  loadSourcePreview: (workflowId: string) => Promise<void>;
   selectSource: (name: string) => void;
   reset: () => void;
 }
@@ -26,10 +26,10 @@ const initial = {
 export const useSourcePreviewStore = create<SourcePreviewState>((set) => ({
   ...initial,
 
-  loadSourcePreview: async (pipelineId) => {
+  loadSourcePreview: async (workflowId) => {
     set({ ...initial, loading: true });
     try {
-      const result = await api.execution.previewSources(pipelineId);
+      const result = await api.execution.previewSources(workflowId);
       set({
         loading: false,
         sources: result.sources,

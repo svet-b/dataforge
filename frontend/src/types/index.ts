@@ -1,11 +1,11 @@
-export interface PipelineParameter {
+export interface WorkflowParameter {
   name: string;
   type: string;
   default?: string | null;
   description?: string | null;
 }
 
-export interface PipelineSummary {
+export interface WorkflowSummary {
   id: string;
   name: string;
   description: string | null;
@@ -14,39 +14,39 @@ export interface PipelineSummary {
   updated_at: string;
 }
 
-export interface PipelineResponse {
+export interface WorkflowResponse {
   id: string;
   name: string;
   description: string | null;
   query: string | null;
-  parameters: PipelineParameter[];
+  parameters: WorkflowParameter[];
   created_at: string;
   updated_at: string;
 }
 
 export interface SourceResponse {
   id: string;
-  pipeline_id: string;
+  workflow_id: string;
   table_name: string;
   type: 'file' | 'api';
   config: Record<string, unknown>;
 }
 
-export interface PipelineDetail extends PipelineResponse {
+export interface WorkflowDetail extends WorkflowResponse {
   sources: SourceResponse[];
 }
 
-export interface PipelineCreate {
+export interface WorkflowCreate {
   name: string;
   description?: string | null;
-  parameters?: PipelineParameter[];
+  parameters?: WorkflowParameter[];
 }
 
-export interface PipelineUpdate {
+export interface WorkflowUpdate {
   name?: string | null;
   description?: string | null;
   query?: string | null;
-  parameters?: PipelineParameter[] | null;
+  parameters?: WorkflowParameter[] | null;
 }
 
 export type SourceType = 'file' | 'api';
@@ -83,7 +83,7 @@ export interface RunResponse {
 
 export interface UploadedFileResponse {
   id: string;
-  pipeline_id: string;
+  workflow_id: string;
   filename: string;
   file_type: string;
   uploaded_at: string;
@@ -96,7 +96,7 @@ export interface ExecutionError {
 
 export interface RunHistorySummary {
   id: string;
-  pipeline_id: string;
+  workflow_id: string;
   parameters: Record<string, unknown>;
   status: string;
   started_at: string;
@@ -121,7 +121,7 @@ export interface TableSchema {
 export interface GenerateSQLRequest {
   prompt: string;
   available_tables: TableSchema[];
-  pipeline_parameters: PipelineParameter[];
+  workflow_parameters: WorkflowParameter[];
   conversation_history: { role: string; content: string }[];
   current_query?: string | null;
 }

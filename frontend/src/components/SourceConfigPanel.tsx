@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SourceResponse, SchemaColumn } from '@/types';
-import { usePipelineStore } from '@/stores/pipeline';
+import { useWorkflowStore } from '@/stores/workflow';
 import { api } from '@/api/client';
 import { addToast } from '@/stores/toasts';
 import { debounce } from '@/utils/debounce';
@@ -10,13 +10,13 @@ import { Textarea } from '@/components/ui/textarea';
 import KeyValueEditor from './KeyValueEditor';
 
 interface SourceConfigPanelProps {
-  pipelineId: string;
+  workflowId: string;
   source: SourceResponse;
 }
 
-export default function SourceConfigPanel({ pipelineId, source }: SourceConfigPanelProps) {
-  const updateSource = usePipelineStore((s) => s.updateSource);
-  const pipeline = usePipelineStore((s) => s.pipeline);
+export default function SourceConfigPanel({ workflowId, source }: SourceConfigPanelProps) {
+  const updateSource = useWorkflowStore((s) => s.updateSource);
+  const workflow = useWorkflowStore((s) => s.workflow);
 
   // ── File source state ──
   const [filename, setFilename] = useState((source.config.filename as string) ?? '');
@@ -48,8 +48,8 @@ export default function SourceConfigPanel({ pipelineId, source }: SourceConfigPa
   const [schemaError, setSchemaError] = useState<string | null>(null);
 
   const otherTableNames = useMemo(
-    () => (pipeline?.sources ?? []).filter((s) => s.id !== source.id).map((s) => s.table_name),
-    [pipeline?.sources, source.id],
+    () => (workflow?.sources ?? []).filter((s) => s.id !== source.id).map((s) => s.table_name),
+    [workflow?.sources, source.id],
   );
 
   const sourceConfigured = source.type === 'file'
@@ -79,7 +79,7 @@ export default function SourceConfigPanel({ pipelineId, source }: SourceConfigPa
     setSchemaLoading(true);
     setSchemaError(null);
     try {
-      const result = await api.sources.schema(pipelineId, source.id);
+      const result = await api.sources.schema(workflowId, source.id);
       setSchemaColumns(result.columns);
       setSchemaRowCount(result.row_count);
     } catch (e) {
@@ -89,7 +89,7 @@ export default function SourceConfigPanel({ pipelineId, source }: SourceConfigPa
     } finally {
       setSchemaLoading(false);
     }
-  }, [pipelineId, source.id]);
+  }, [workflowId, source.id]);
 
   // Auto-fetch schema when source is configured
   useEffect(() => {
@@ -126,12 +126,12 @@ export default function SourceConfigPanel({ pipelineId, source }: SourceConfigPa
               body: s.method === 'POST' ? s.body : undefined,
               response_path: s.responsePath || undefined,
             };
-        updateSource(pipelineId, source.id, {
+        updateSource(workflowId, source.id, {
           table_name: s.tableName || undefined,
           config,
         });
       }, 500),
-    [pipelineId, source.id, source.type, updateSource],
+    [workflowId, source.id, source.type, updateSource],
   );
 
   function onFieldChange() {
@@ -158,7 +158,7 @@ export default function SourceConfigPanel({ pipelineId, source }: SourceConfigPa
   async function handleFile(file: File) {
     setUploading(true);
     try {
-      const result = await api.files.upload(pipelineId, file);
+      const result = await api.files.upload(workflowId, file);
       setFilename(result.filename);
       setFileType(result.file_type);
 

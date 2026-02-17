@@ -10,15 +10,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
-    from app.models.pipeline import Pipeline
+    from app.models.workflow import Workflow
 
 
 class UploadedFile(Base):
     __tablename__ = "uploaded_files"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    pipeline_id: Mapped[str] = mapped_column(
-        String, ForeignKey("pipelines.id", ondelete="CASCADE"), nullable=False
+    workflow_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
     )
     filename: Mapped[str] = mapped_column(Text, nullable=False)
     file_type: Mapped[str] = mapped_column(Text, nullable=False)
@@ -27,4 +27,4 @@ class UploadedFile(Base):
         String, nullable=False, default=lambda: datetime.now(UTC).isoformat()
     )
 
-    pipeline: Mapped[Pipeline] = relationship("Pipeline", back_populates="uploaded_files")
+    workflow: Mapped[Workflow] = relationship("Workflow", back_populates="uploaded_files")

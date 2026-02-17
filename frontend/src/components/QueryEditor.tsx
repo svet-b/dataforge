@@ -1,34 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePipelineStore } from '@/stores/pipeline';
+import { useWorkflowStore } from '@/stores/workflow';
 import { debounce } from '@/utils/debounce';
 import SqlEditor from './SqlEditor';
 
 interface QueryEditorProps {
-  pipelineId: string;
+  workflowId: string;
   onRun: () => void;
   onSqlRef?: (setter: (sql: string) => void) => void;
 }
 
-export default function QueryEditor({ pipelineId, onRun, onSqlRef }: QueryEditorProps) {
-  const pipelineQuery = usePipelineStore((s) => s.pipeline?.query ?? '');
-  const updatePipelineQuery = usePipelineStore((s) => s.updatePipelineQuery);
-  const [queryValue, setQueryValue] = useState(pipelineQuery);
+export default function QueryEditor({ workflowId, onRun, onSqlRef }: QueryEditorProps) {
+  const workflowQuery = useWorkflowStore((s) => s.workflow?.query ?? '');
+  const updateWorkflowQuery = useWorkflowStore((s) => s.updateWorkflowQuery);
+  const [queryValue, setQueryValue] = useState(workflowQuery);
   const queryValueRef = useRef(queryValue);
   queryValueRef.current = queryValue;
 
-  // Sync from store when pipeline loads
+  // Sync from store when workflow loads
   useEffect(() => {
-    if (pipelineQuery !== queryValueRef.current) {
-      setQueryValue(pipelineQuery);
+    if (workflowQuery !== queryValueRef.current) {
+      setQueryValue(workflowQuery);
     }
-  }, [pipelineQuery]);
+  }, [workflowQuery]);
 
   const saveQuery = useMemo(
     () =>
       debounce((...args: unknown[]) => {
-        updatePipelineQuery(pipelineId, args[0] as string);
+        updateWorkflowQuery(workflowId, args[0] as string);
       }, 800),
-    [pipelineId, updatePipelineQuery],
+    [workflowId, updateWorkflowQuery],
   );
 
   const handleQueryChange = useCallback(
@@ -41,10 +41,10 @@ export default function QueryEditor({ pipelineId, onRun, onSqlRef }: QueryEditor
 
   const handleRun = useCallback(() => {
     saveQuery.cancel();
-    updatePipelineQuery(pipelineId, queryValueRef.current).then(() => {
+    updateWorkflowQuery(workflowId, queryValueRef.current).then(() => {
       onRun();
     });
-  }, [pipelineId, updatePipelineQuery, onRun, saveQuery]);
+  }, [workflowId, updateWorkflowQuery, onRun, saveQuery]);
 
   // Expose setSql to parent
   useEffect(() => {

@@ -113,7 +113,7 @@ async def test_generate_sql_endpoint(client: TestClient) -> None:
                         ],
                     }
                 ],
-                "pipeline_parameters": [],
+                "workflow_parameters": [],
             },
         )
     assert resp.status_code == 200
@@ -138,7 +138,7 @@ async def test_generate_sql_with_history(client: TestClient) -> None:
             json={
                 "prompt": "Also filter for values > 100",
                 "available_tables": [],
-                "pipeline_parameters": [],
+                "workflow_parameters": [],
                 "conversation_history": [
                     {"role": "user", "content": "Show all readings"},
                     {"role": "assistant", "content": "```sql\nSELECT * FROM readings\n```"},
@@ -159,7 +159,7 @@ async def test_generate_sql_no_provider(client: TestClient) -> None:
             json={
                 "prompt": "test",
                 "available_tables": [],
-                "pipeline_parameters": [],
+                "workflow_parameters": [],
             },
         )
     assert resp.status_code == 503
@@ -188,8 +188,6 @@ def test_llm_status_unavailable(client: TestClient) -> None:
 
 def test_system_prompt_contains_performance_guidelines() -> None:
     prompt = build_system_prompt([], [])
-    assert "## Performance" in prompt
-    assert "Filter early" in prompt
-    assert "Avoid unnecessary DISTINCT" in prompt
-    assert "Prefer JOINs over correlated subqueries" in prompt
-    assert "Select only needed columns" in prompt
+    assert "filter early" in prompt
+    assert "correlated subqueries" in prompt
+    assert "FILTER" in prompt

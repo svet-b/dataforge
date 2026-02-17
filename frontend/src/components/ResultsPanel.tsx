@@ -9,12 +9,12 @@ import DataViewer from './DataViewer';
 import { ChevronDown, Loader2 } from 'lucide-react';
 
 interface ResultsPanelProps {
-  pipelineId: string;
+  workflowId: string;
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
 
-export default function ResultsPanel({ pipelineId, activeTab, onTabChange }: ResultsPanelProps) {
+export default function ResultsPanel({ workflowId, activeTab, onTabChange }: ResultsPanelProps) {
   // Results
   const results = useResultsStore();
 
@@ -36,13 +36,13 @@ export default function ResultsPanel({ pipelineId, activeTab, onTabChange }: Res
   // Load data when switching tabs
   useEffect(() => {
     if (activeTab === 'history') {
-      loadRuns(pipelineId);
+      loadRuns(workflowId);
     }
     if (activeTab === 'inputs' && !sourcePreviewState.cached && !sourcePreviewState.loading) {
-      sourcePreviewState.loadSourcePreview(pipelineId);
+      sourcePreviewState.loadSourcePreview(workflowId);
     }
     if (activeTab === 'ctes' && results.runId !== cteState.cachedForRunId && !cteState.loading) {
-      cteState.loadCteInspection(pipelineId, results.runId);
+      cteState.loadCteInspection(workflowId, results.runId);
     }
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -51,7 +51,7 @@ export default function ResultsPanel({ pipelineId, activeTab, onTabChange }: Res
       setExpandedRunId(null);
     } else {
       setExpandedRunId(runId);
-      loadRunDetail(pipelineId, runId);
+      loadRunDetail(workflowId, runId);
     }
   }
 
@@ -60,7 +60,7 @@ export default function ResultsPanel({ pipelineId, activeTab, onTabChange }: Res
   }
 
   function downloadUrl(runId: string, format: 'csv' | 'json'): string {
-    return api.download.url(pipelineId, runId, format);
+    return api.download.url(workflowId, runId, format);
   }
 
   const selectedSourceData = useMemo(
@@ -175,7 +175,7 @@ export default function ResultsPanel({ pipelineId, activeTab, onTabChange }: Res
           <div className="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{results.error}</div>
         ) : results.data.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-gray-400">
-            No results yet. Click Run to execute the pipeline.
+            No results yet. Click Run to execute the workflow.
           </div>
         ) : (
           <>
@@ -214,7 +214,7 @@ export default function ResultsPanel({ pipelineId, activeTab, onTabChange }: Res
           <div className="flex h-full items-center justify-center text-sm text-gray-500">Loading runs...</div>
         ) : runs.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-gray-400">
-            No runs yet. Click Run to execute the pipeline.
+            No runs yet. Click Run to execute the workflow.
           </div>
         ) : (
           <div className="divide-y divide-gray-100">

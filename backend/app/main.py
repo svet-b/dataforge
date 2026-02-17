@@ -1,7 +1,12 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import execution, llm, pipelines
+from app.config import settings
+from app.routers import execution, llm, workflows
+
+logging.basicConfig(level=settings.log_level.upper())
 
 app = FastAPI(title="DataForge", version="0.1.0")
 
@@ -15,7 +20,7 @@ app.add_middleware(
 
 app.include_router(execution.router)
 app.include_router(llm.router)
-app.include_router(pipelines.router)
+app.include_router(workflows.router)
 
 
 @app.get("/api/health")

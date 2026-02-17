@@ -1,5 +1,5 @@
 import { test, expect } from './helpers/fixtures.js';
-import { createPipeline, addSource, updatePipeline } from './helpers/api.js';
+import { createWorkflow, addSource, updateWorkflow } from './helpers/api.js';
 
 /**
  * End-to-end integration test: upload CSV → write query → run → verify output.
@@ -8,12 +8,12 @@ test.describe('Integration: CSV → SQL Query → Run', () => {
 	test('uploads CSV, writes query, runs, and verifies output', async ({ page }) => {
 		await page.setViewportSize({ width: 1400, height: 900 });
 
-		// --- Setup via API: pipeline + file source ---
-		const pipeline = await createPipeline('CSV Integration Test');
-		await addSource(pipeline.id, 'file', 'sales');
+		// --- Setup via API: workflow + file source ---
+		const workflow = await createWorkflow('CSV Integration Test');
+		await addSource(workflow.id, 'file', 'sales');
 
-		// --- Navigate to the pipeline editor ---
-		await page.goto(`/pipelines/${pipeline.id}`);
+		// --- Navigate to the workflow editor ---
+		await page.goto(`/workflows/${workflow.id}`);
 		await expect(page.getByTestId('toolbar')).toBeVisible();
 
 		// Should see the source list with our source
@@ -56,7 +56,7 @@ test.describe('Integration: CSV → SQL Query → Run', () => {
 		// ============================================================
 		const sqlQuery =
 			'SELECT product, SUM(amount) as total_amount FROM sales GROUP BY product ORDER BY product';
-		await updatePipeline(pipeline.id, { query: sqlQuery });
+		await updateWorkflow(workflow.id, { query: sqlQuery });
 
 		// Reload so the editor picks up the query
 		await page.reload();
@@ -68,7 +68,7 @@ test.describe('Integration: CSV → SQL Query → Run', () => {
 		await expect(cmEditor).toContainText('SELECT product');
 
 		// ============================================================
-		// Step 3: Run the pipeline and verify results
+		// Step 3: Run the workflow and verify results
 		// ============================================================
 		await page.getByRole('button', { name: 'Run', exact: true }).click();
 

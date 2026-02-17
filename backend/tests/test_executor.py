@@ -4,18 +4,18 @@ import pytest
 
 from app.config import Settings
 from app.engine.duckdb_manager import DuckDBSession
-from app.engine.executor import PipelineExecutor
+from app.engine.executor import WorkflowExecutor
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture()
-def executor() -> PipelineExecutor:
-    return PipelineExecutor(Settings(database_url="sqlite://"))
+def executor() -> WorkflowExecutor:
+    return WorkflowExecutor(Settings(database_url="sqlite://"))
 
 
 @pytest.mark.asyncio
-async def test_simple_pipeline_execution(executor: PipelineExecutor) -> None:
+async def test_simple_workflow_execution(executor: WorkflowExecutor) -> None:
     """CSV source -> aggregate query."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
     sources = [
@@ -29,7 +29,7 @@ async def test_simple_pipeline_execution(executor: PipelineExecutor) -> None:
     query = "SELECT meter_id, SUM(energy_kwh) AS total FROM raw_data GROUP BY meter_id"
 
     result = await executor.execute(
-        pipeline_id="test-pipe",
+        workflow_id="test-wf",
         sources=sources,
         query=query,
         parameters={},
@@ -45,7 +45,7 @@ async def test_simple_pipeline_execution(executor: PipelineExecutor) -> None:
 
 
 @pytest.mark.asyncio
-async def test_pipeline_with_parameters(executor: PipelineExecutor) -> None:
+async def test_workflow_with_parameters(executor: WorkflowExecutor) -> None:
     """Verify DuckDB variables are accessible in SQL via getvariable()."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
     sources = [
@@ -59,7 +59,7 @@ async def test_pipeline_with_parameters(executor: PipelineExecutor) -> None:
     query = "SELECT * FROM raw_data WHERE meter_id = getvariable('target_meter')"
 
     result = await executor.execute(
-        pipeline_id="test-pipe",
+        workflow_id="test-wf",
         sources=sources,
         query=query,
         parameters={"target_meter": "M-001"},
@@ -72,7 +72,7 @@ async def test_pipeline_with_parameters(executor: PipelineExecutor) -> None:
 
 
 @pytest.mark.asyncio
-async def test_transform_error_handling(executor: PipelineExecutor) -> None:
+async def test_transform_error_handling(executor: WorkflowExecutor) -> None:
     """Verify that bad SQL produces a clear error."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
     sources = [
@@ -86,7 +86,7 @@ async def test_transform_error_handling(executor: PipelineExecutor) -> None:
     query = "SELECT nonexistent_column FROM raw_data"
 
     result = await executor.execute(
-        pipeline_id="test-pipe",
+        workflow_id="test-wf",
         sources=sources,
         query=query,
         parameters={},
@@ -98,7 +98,7 @@ async def test_transform_error_handling(executor: PipelineExecutor) -> None:
 
 
 @pytest.mark.asyncio
-async def test_multiple_sources_with_join(executor: PipelineExecutor) -> None:
+async def test_multiple_sources_with_join(executor: WorkflowExecutor) -> None:
     """Verify that multiple sources can be joined in a single query."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
     sources = [
@@ -123,7 +123,7 @@ async def test_multiple_sources_with_join(executor: PipelineExecutor) -> None:
     )
 
     result = await executor.execute(
-        pipeline_id="test-pipe",
+        workflow_id="test-wf",
         sources=sources,
         query=query,
         parameters={},
@@ -135,7 +135,7 @@ async def test_multiple_sources_with_join(executor: PipelineExecutor) -> None:
 
 
 @pytest.mark.asyncio
-async def test_preview_with_limit(executor: PipelineExecutor) -> None:
+async def test_preview_with_limit(executor: WorkflowExecutor) -> None:
     """Verify that preview_limit constrains returned rows."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
     sources = [
@@ -149,7 +149,7 @@ async def test_preview_with_limit(executor: PipelineExecutor) -> None:
     query = "SELECT * FROM raw_data"
 
     result = await executor.execute(
-        pipeline_id="test-pipe",
+        workflow_id="test-wf",
         sources=sources,
         query=query,
         parameters={},
@@ -164,7 +164,7 @@ async def test_preview_with_limit(executor: PipelineExecutor) -> None:
 
 
 @pytest.mark.asyncio
-async def test_cte_query(executor: PipelineExecutor) -> None:
+async def test_cte_query(executor: WorkflowExecutor) -> None:
     """Verify that CTEs work for multi-step transformations."""
     csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
     sources = [
@@ -187,7 +187,7 @@ async def test_cte_query(executor: PipelineExecutor) -> None:
     """
 
     result = await executor.execute(
-        pipeline_id="test-pipe",
+        workflow_id="test-wf",
         sources=sources,
         query=query,
         parameters={},

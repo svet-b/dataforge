@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     from app.models.uploaded_file import UploadedFile
 
 
-class Pipeline(Base):
-    __tablename__ = "pipelines"
+class Workflow(Base):
+    __tablename__ = "workflows"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -31,11 +31,11 @@ class Pipeline(Base):
     )
 
     sources: Mapped[list[Source]] = relationship(
-        "Source", back_populates="pipeline", cascade="all, delete-orphan"
+        "Source", back_populates="workflow", cascade="all, delete-orphan"
     )
     uploaded_files: Mapped[list[UploadedFile]] = relationship(
-        "UploadedFile", back_populates="pipeline", cascade="all, delete-orphan"
+        "UploadedFile", back_populates="workflow", cascade="all, delete-orphan"
     )
     runs: Mapped[list[RunHistory]] = relationship(
-        "RunHistory", back_populates="pipeline", cascade="all, delete-orphan"
+        "RunHistory", back_populates="workflow", cascade="all, delete-orphan"
     )

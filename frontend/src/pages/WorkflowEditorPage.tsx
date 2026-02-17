@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { usePipelineStore } from '@/stores/pipeline';
+import { useWorkflowStore } from '@/stores/workflow';
 import { useRunsStore } from '@/stores/runs';
 import { useResultsStore } from '@/stores/results';
 import { useCteInspectionStore } from '@/stores/cteInspection';
@@ -16,16 +16,16 @@ import LlmChat from '@/components/LlmChat';
 
 type DragTarget = 'left-divider' | 'right-divider' | 'middle-divider' | null;
 
-export default function PipelineEditorPage() {
-  const { id: pipelineId } = useParams<{ id: string }>();
+export default function WorkflowEditorPage() {
+  const { id: workflowId } = useParams<{ id: string }>();
 
-  const pipeline = usePipelineStore((s) => s.pipeline);
-  const loading = usePipelineStore((s) => s.loading);
-  const error = usePipelineStore((s) => s.error);
-  const selectedSourceId = usePipelineStore((s) => s.selectedSourceId);
-  const loadPipeline = usePipelineStore((s) => s.loadPipeline);
-  const resetPipeline = usePipelineStore((s) => s.reset);
-  const runPipeline = usePipelineStore((s) => s.runPipeline);
+  const workflow = useWorkflowStore((s) => s.workflow);
+  const loading = useWorkflowStore((s) => s.loading);
+  const error = useWorkflowStore((s) => s.error);
+  const selectedSourceId = useWorkflowStore((s) => s.selectedSourceId);
+  const loadWorkflow = useWorkflowStore((s) => s.loadWorkflow);
+  const resetWorkflow = useWorkflowStore((s) => s.reset);
+  const runWorkflow = useWorkflowStore((s) => s.runWorkflow);
   const resetRuns = useRunsStore((s) => s.reset);
   const loadRuns = useRunsStore((s) => s.loadRuns);
   const clearResults = useResultsStore((s) => s.clear);
@@ -56,21 +56,21 @@ export default function PipelineEditorPage() {
   const sqlSetterRef = useRef<((sql: string) => void) | null>(null);
 
   const selectedSource = useMemo(
-    () => pipeline?.sources.find((s) => s.id === selectedSourceId) ?? null,
-    [pipeline?.sources, selectedSourceId],
+    () => workflow?.sources.find((s) => s.id === selectedSourceId) ?? null,
+    [workflow?.sources, selectedSourceId],
   );
 
   useEffect(() => {
-    if (pipelineId) loadPipeline(pipelineId);
+    if (workflowId) loadWorkflow(workflowId);
     return () => {
-      resetPipeline();
+      resetWorkflow();
       resetRuns();
       clearResults();
       resetCte();
       resetSourcePreview();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pipelineId]);
+  }, [workflowId]);
 
   // Keyboard shortcut
   useEffect(() => {
@@ -116,7 +116,7 @@ export default function PipelineEditorPage() {
   }
 
   function handleRun() {
-    const params = pipeline?.parameters ?? [];
+    const params = workflow?.parameters ?? [];
     if (params.length > 0) {
       setShowRunDialog(true);
     } else {
@@ -125,16 +125,16 @@ export default function PipelineEditorPage() {
   }
 
   async function executeRun() {
-    if (!pipelineId) return;
+    if (!workflowId) return;
     setResultsLoading();
     setResultsTab('results');
-    const result = await runPipeline(pipelineId);
+    const result = await runWorkflow(workflowId);
     if (result) {
       setResults(result);
     } else {
       setResultsError('Run failed');
     }
-    await loadRuns(pipelineId);
+    await loadRuns(workflowId);
   }
 
   const handleSqlGenerated = useCallback((sql: string) => {
@@ -145,23 +145,23 @@ export default function PipelineEditorPage() {
     sqlSetterRef.current = setter;
   }, []);
 
-  if (!pipelineId) return null;
+  if (!workflowId) return null;
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center text-gray-500">Loading pipeline...</div>;
+    return <div className="flex h-screen items-center justify-center text-gray-500">Loading workflow...</div>;
   }
 
   if (error) {
     return <div className="flex h-screen items-center justify-center text-red-500">Error: {error}</div>;
   }
 
-  if (!pipeline) return null;
+  if (!workflow) return null;
 
   return (
-    <div className="flex h-screen flex-col" data-testid="pipeline-editor">
+    <div className="flex h-screen flex-col" data-testid="workflow-editor">
       <Toolbar
-        pipelineId={pipelineId}
-        pipelineName={pipeline.name}
+        workflowId={workflowId}
+        workflowName={workflow.name}
         onOpenParams={() => setShowParamModal(true)}
         onRun={handleRun}
       />
@@ -169,7 +169,7 @@ export default function PipelineEditorPage() {
       <div className={`flex flex-1 overflow-hidden ${isDragging ? 'select-none' : ''}`}>
         {/* Left column: AI Chat */}
         <div className="flex shrink-0 flex-col bg-white" style={{ width: leftColWidth }}>
-          <LlmChat pipelineId={pipelineId} onSqlGenerated={handleSqlGenerated} />
+          <LlmChat workflowId={workflowId} onSqlGenerated={handleSqlGenerated} />
         </div>
 
         {/* Left divider */}
@@ -186,9 +186,9 @@ export default function PipelineEditorPage() {
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* Sources pane */}
           <div className="shrink-0 overflow-y-auto bg-white" style={{ height: sourcesHeight }}>
-            <SourceList pipelineId={pipelineId} />
+            <SourceList workflowId={workflowId} />
             {selectedSource && (
-              <SourceConfigPanel pipelineId={pipelineId} source={selectedSource} />
+              <SourceConfigPanel workflowId={workflowId} source={selectedSource} />
             )}
           </div>
 
@@ -204,7 +204,7 @@ export default function PipelineEditorPage() {
 
           {/* SQL Editor pane */}
           <div className="flex flex-1 flex-col overflow-hidden bg-white">
-            <QueryEditor pipelineId={pipelineId} onRun={handleRun} onSqlRef={handleSqlRef} />
+            <QueryEditor workflowId={workflowId} onRun={handleRun} onSqlRef={handleSqlRef} />
           </div>
         </div>
 
@@ -220,20 +220,20 @@ export default function PipelineEditorPage() {
 
         {/* Right column: Results */}
         <div className="flex shrink-0 flex-col bg-white" style={{ width: rightColWidth }}>
-          <ResultsPanel pipelineId={pipelineId} activeTab={resultsTab} onTabChange={setResultsTab} />
+          <ResultsPanel workflowId={workflowId} activeTab={resultsTab} onTabChange={setResultsTab} />
         </div>
       </div>
 
       <ParameterModal
-        pipelineId={pipelineId}
-        parameters={pipeline.parameters ?? []}
+        workflowId={workflowId}
+        parameters={workflow.parameters ?? []}
         open={showParamModal}
         onClose={() => setShowParamModal(false)}
       />
 
       <RunDialog
-        pipelineId={pipelineId}
-        parameters={pipeline.parameters ?? []}
+        workflowId={workflowId}
+        parameters={workflow.parameters ?? []}
         open={showRunDialog}
         onClose={() => setShowRunDialog(false)}
         onRunComplete={() => setResultsTab('results')}

@@ -1,12 +1,12 @@
 import { test, expect } from './helpers/fixtures.js';
-import { createPipeline, updatePipeline } from './helpers/api.js';
+import { createWorkflow, updateWorkflow } from './helpers/api.js';
 
-test.describe('Pipeline run', () => {
-	test('runs pipeline with simple query', async ({ page }) => {
-		const pipeline = await createPipeline('Run Test');
-		await updatePipeline(pipeline.id, { query: 'SELECT 1 as value' });
+test.describe('Workflow run', () => {
+	test('runs workflow with simple query', async ({ page }) => {
+		const workflow = await createWorkflow('Run Test');
+		await updateWorkflow(workflow.id, { query: 'SELECT 1 as value' });
 
-		await page.goto(`/pipelines/${pipeline.id}`);
+		await page.goto(`/workflows/${workflow.id}`);
 		await expect(page.getByTestId('toolbar')).toBeVisible();
 
 		// No params → Run executes directly (no dialog)
@@ -22,8 +22,8 @@ test.describe('Pipeline run', () => {
 	});
 
 	test('switches between results and history tabs', async ({ page }) => {
-		const pipeline = await createPipeline('Tab Test');
-		await page.goto(`/pipelines/${pipeline.id}`);
+		const workflow = await createWorkflow('Tab Test');
+		await page.goto(`/workflows/${workflow.id}`);
 
 		// Results tab should be visible by default
 		await expect(page.getByTestId('tab-results')).toBeVisible();

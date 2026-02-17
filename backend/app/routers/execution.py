@@ -14,11 +14,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.engine.executor import PipelineExecutor
-from app.models.pipeline import Pipeline
+from app.engine.executor import WorkflowExecutor
 from app.models.run import RunHistory
 from app.models.source import Source
 from app.models.uploaded_file import UploadedFile
+from app.models.workflow import Workflow
 from app.schemas.execution import (
     CTEInspectionResponse,
     RunRequest,
@@ -29,7 +29,7 @@ from app.schemas.execution import (
     ValidateQueryResponse,
 )
 
-router = APIRouter(prefix="/api/pipelines", tags=["execution"])
+router = APIRouter(prefix="/api/workflows", tags=["execution"])
 
 
 def _json_safe(obj: Any) -> Any:
@@ -45,20 +45,20 @@ def _json_safe(obj: Any) -> Any:
     return obj
 
 
-def _load_pipeline(
-    pipeline_id: str, db: Session
-) -> tuple[Pipeline, list[dict[str, Any]], str | None]:
-    """Load pipeline, its sources (with file paths resolved), and its query."""
-    pipeline = db.get(Pipeline, pipeline_id)
-    if not pipeline:
-        raise HTTPException(status_code=404, detail="Pipeline not found")
+def _load_workflow(
+    workflow_id: str, db: Session
+) -> tuple[Workflow, list[dict[str, Any]], str | None]:
+    """Load workflow, its sources (with file paths resolved), and its query."""
+    workflow = db.get(Workflow, workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
 
     # Build a filename → storage_path lookup for uploaded files
-    uploaded_files = db.query(UploadedFile).filter(UploadedFile.pipeline_id == pipeline_id).all()
+    uploaded_files = db.query(UploadedFile).filter(UploadedFile.workflow_id == workflow_id).all()
     file_path_map = {uf.filename: uf.storage_path for uf in uploaded_files}
 
     sources = []
-    for s in pipeline.sources:
+    for s in workflow.sources:
         config = dict(s.config)
         # Resolve filename to file_path for file sources
         if s.type == "file" and "filename" in config and "file_path" not in config:
@@ -73,13 +73,13 @@ def _load_pipeline(
                 "config": config,
             }
         )
-    return pipeline, sources, pipeline.query
+    return workflow, sources, workflow.query
 
 
-def _merge_parameters(pipeline: Pipeline, supplied: dict[str, Any]) -> dict[str, Any]:
-    """Merge supplied parameters with pipeline defaults."""
+def _merge_parameters(workflow: Workflow, supplied: dict[str, Any]) -> dict[str, Any]:
+    """Merge supplied parameters with workflow defaults."""
     merged: dict[str, Any] = {}
-    for param in pipeline.parameters:
+    for param in workflow.parameters:
         name = param["name"]
         if name in supplied:
             merged[name] = supplied[name]
@@ -92,20 +92,20 @@ def _merge_parameters(pipeline: Pipeline, supplied: dict[str, Any]) -> dict[str,
     return merged
 
 
-@router.post("/{pipeline_id}/run")
-async def run_pipeline(
-    pipeline_id: str,
+@router.post("/{workflow_id}/run")
+async def run_workflow(
+    workflow_id: str,
     body: RunRequest,
     db: Session = Depends(get_db),
 ) -> RunResponse:
-    pipeline, sources, query = _load_pipeline(pipeline_id, db)
+    workflow, sources, query = _load_workflow(workflow_id, db)
     if not query or not query.strip():
-        raise HTTPException(status_code=400, detail="Pipeline has no query defined")
-    parameters = _merge_parameters(pipeline, body.parameters)
+        raise HTTPException(status_code=400, detail="Workflow has no query defined")
+    parameters = _merge_parameters(workflow, body.parameters)
 
-    executor = PipelineExecutor(settings)
+    executor = WorkflowExecutor(settings)
     exec_result = await executor.execute(
-        pipeline_id=pipeline_id,
+        workflow_id=workflow_id,
         sources=sources,
         query=query,
         parameters=parameters,
@@ -120,7 +120,7 @@ async def run_pipeline(
     now = datetime.now(UTC).isoformat()
     run = RunHistory(
         id=run_id,
-        pipeline_id=pipeline_id,
+        workflow_id=workflow_id,
         parameters=parameters,
         status=exec_result.status,
         started_at=now,
@@ -139,7 +139,7 @@ async def run_pipeline(
     # Prune old runs
     runs = (
         db.query(RunHistory)
-        .filter(RunHistory.pipeline_id == pipeline_id)
+        .filter(RunHistory.workflow_id == workflow_id)
         .order_by(RunHistory.started_at.desc())
         .all()
     )
@@ -160,21 +160,21 @@ async def run_pipeline(
     )
 
 
-@router.post("/{pipeline_id}/inspect-ctes")
+@router.post("/{workflow_id}/inspect-ctes")
 async def inspect_ctes(
-    pipeline_id: str,
+    workflow_id: str,
     body: RunRequest,
     db: Session = Depends(get_db),
 ) -> CTEInspectionResponse:
     """Inspect intermediate CTE results without creating a run history entry."""
-    pipeline, sources, query = _load_pipeline(pipeline_id, db)
+    workflow, sources, query = _load_workflow(workflow_id, db)
     if not query or not query.strip():
-        raise HTTPException(status_code=400, detail="Pipeline has no query defined")
-    parameters = _merge_parameters(pipeline, body.parameters)
+        raise HTTPException(status_code=400, detail="Workflow has no query defined")
+    parameters = _merge_parameters(workflow, body.parameters)
 
-    executor = PipelineExecutor(settings)
+    executor = WorkflowExecutor(settings)
     result = await executor.inspect_ctes(
-        pipeline_id=pipeline_id,
+        workflow_id=workflow_id,
         sources=sources,
         query=query,
         parameters=parameters,
@@ -197,19 +197,19 @@ async def inspect_ctes(
     )
 
 
-@router.post("/{pipeline_id}/validate-query")
+@router.post("/{workflow_id}/validate-query")
 async def validate_query(
-    pipeline_id: str,
+    workflow_id: str,
     body: ValidateQueryRequest,
     db: Session = Depends(get_db),
 ) -> ValidateQueryResponse:
-    """Validate a SQL query against the pipeline's sources without executing it."""
-    pipeline, sources, _query = _load_pipeline(pipeline_id, db)
-    parameters = _merge_parameters(pipeline, {})
+    """Validate a SQL query against the workflow's sources without executing it."""
+    workflow, sources, _query = _load_workflow(workflow_id, db)
+    parameters = _merge_parameters(workflow, {})
 
     from app.engine.duckdb_manager import DuckDBSession
 
-    executor = PipelineExecutor(settings)
+    executor = WorkflowExecutor(settings)
     session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
     try:
         for name, value in parameters.items():
@@ -228,13 +228,13 @@ async def validate_query(
         session.close()
 
 
-@router.post("/{pipeline_id}/preview-sources")
+@router.post("/{workflow_id}/preview-sources")
 async def preview_sources(
-    pipeline_id: str,
+    workflow_id: str,
     db: Session = Depends(get_db),
 ) -> SourcePreviewResponse:
     """Load each source and return schema + data preview (up to 100 rows)."""
-    _pipeline, sources, _query = _load_pipeline(pipeline_id, db)
+    _workflow, sources, _query = _load_workflow(workflow_id, db)
     if not sources:
         return SourcePreviewResponse(status="success", duration_ms=0, sources=[])
 
@@ -243,7 +243,7 @@ async def preview_sources(
     from app.engine.duckdb_manager import DuckDBSession
 
     start_time = time.monotonic()
-    executor = PipelineExecutor(settings)
+    executor = WorkflowExecutor(settings)
     session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
     results: list[dict[str, Any]] = []
     try:
@@ -282,23 +282,23 @@ async def preview_sources(
     )
 
 
-@router.post("/{pipeline_id}/sources/{source_id}/schema")
+@router.post("/{workflow_id}/sources/{source_id}/schema")
 async def source_schema(
-    pipeline_id: str,
+    workflow_id: str,
     source_id: str,
     db: Session = Depends(get_db),
 ) -> SourceSchemaResponse:
     """Load a single source into DuckDB and return its schema and row count."""
-    pipeline = db.get(Pipeline, pipeline_id)
-    if not pipeline:
-        raise HTTPException(status_code=404, detail="Pipeline not found")
+    workflow = db.get(Workflow, workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
 
     source_model = db.get(Source, source_id)
-    if not source_model or source_model.pipeline_id != pipeline_id:
+    if not source_model or source_model.workflow_id != workflow_id:
         raise HTTPException(status_code=404, detail="Source not found")
 
     # Resolve file path if needed
-    uploaded_files = db.query(UploadedFile).filter(UploadedFile.pipeline_id == pipeline_id).all()
+    uploaded_files = db.query(UploadedFile).filter(UploadedFile.workflow_id == workflow_id).all()
     file_path_map = {uf.filename: uf.storage_path for uf in uploaded_files}
     config = dict(source_model.config)
     if (
@@ -319,7 +319,7 @@ async def source_schema(
 
     from app.engine.duckdb_manager import DuckDBSession
 
-    executor = PipelineExecutor(settings)
+    executor = WorkflowExecutor(settings)
     session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
     try:
         await executor._load_source(session, source_dict, {})
@@ -333,18 +333,18 @@ async def source_schema(
     return SourceSchemaResponse(columns=columns, row_count=row_count)
 
 
-@router.get("/{pipeline_id}/runs/{run_id}/download")
+@router.get("/{workflow_id}/runs/{run_id}/download")
 def download_run(
-    pipeline_id: str,
+    workflow_id: str,
     run_id: str,
     format: str = Query(default="csv", pattern="^(csv|json)$"),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    pipeline = db.get(Pipeline, pipeline_id)
-    if not pipeline:
-        raise HTTPException(status_code=404, detail="Pipeline not found")
+    workflow = db.get(Workflow, workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
     run = db.get(RunHistory, run_id)
-    if not run or run.pipeline_id != pipeline_id:
+    if not run or run.workflow_id != workflow_id:
         raise HTTPException(status_code=404, detail="Run not found")
     if run.status != "success" or not run.output_preview:
         raise HTTPException(status_code=400, detail="Run has no output data")

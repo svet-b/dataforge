@@ -6,8 +6,8 @@ interface RunsState {
   runs: RunHistorySummary[];
   expandedRun: RunHistoryDetail | null;
   loading: boolean;
-  loadRuns: (pipelineId: string) => Promise<void>;
-  loadRunDetail: (pipelineId: string, runId: string) => Promise<void>;
+  loadRuns: (workflowId: string) => Promise<void>;
+  loadRunDetail: (workflowId: string, runId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -16,10 +16,10 @@ export const useRunsStore = create<RunsState>((set) => ({
   expandedRun: null,
   loading: false,
 
-  loadRuns: async (pipelineId) => {
+  loadRuns: async (workflowId) => {
     set({ loading: true });
     try {
-      const runs = await api.runs.list(pipelineId);
+      const runs = await api.runs.list(workflowId);
       set({ runs, expandedRun: null, loading: false });
     } catch (e) {
       const msg = e instanceof ApiError ? e.detail : e instanceof Error ? e.message : String(e);
@@ -28,9 +28,9 @@ export const useRunsStore = create<RunsState>((set) => ({
     }
   },
 
-  loadRunDetail: async (pipelineId, runId) => {
+  loadRunDetail: async (workflowId, runId) => {
     try {
-      const detail = await api.runs.get(pipelineId, runId);
+      const detail = await api.runs.get(workflowId, runId);
       set({ expandedRun: detail });
     } catch (e) {
       const msg = e instanceof ApiError ? e.detail : e instanceof Error ? e.message : String(e);

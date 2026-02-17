@@ -4,14 +4,14 @@ from typing import Any
 import pytest
 
 from app.config import Settings
-from app.engine.executor import PipelineExecutor
+from app.engine.executor import WorkflowExecutor
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture()
-def executor() -> PipelineExecutor:
-    return PipelineExecutor(Settings(database_url="sqlite://"))
+def executor() -> WorkflowExecutor:
+    return WorkflowExecutor(Settings(database_url="sqlite://"))
 
 
 def _csv_sources() -> list[dict[str, Any]]:
@@ -27,7 +27,7 @@ def _csv_sources() -> list[dict[str, Any]]:
 
 
 @pytest.mark.asyncio
-async def test_inspect_single_cte(executor: PipelineExecutor) -> None:
+async def test_inspect_single_cte(executor: WorkflowExecutor) -> None:
     query = """
     WITH totals AS (
         SELECT meter_id, SUM(energy_kwh) AS total
@@ -37,7 +37,7 @@ async def test_inspect_single_cte(executor: PipelineExecutor) -> None:
     SELECT * FROM totals WHERE total > 40
     """
     result = await executor.inspect_ctes(
-        pipeline_id="test",
+        workflow_id="test",
         sources=_csv_sources(),
         query=query,
         parameters={},
@@ -54,7 +54,7 @@ async def test_inspect_single_cte(executor: PipelineExecutor) -> None:
 
 
 @pytest.mark.asyncio
-async def test_inspect_multiple_ctes(executor: PipelineExecutor) -> None:
+async def test_inspect_multiple_ctes(executor: WorkflowExecutor) -> None:
     query = """
     WITH step1 AS (
         SELECT meter_id, energy_kwh, voltage
@@ -69,7 +69,7 @@ async def test_inspect_multiple_ctes(executor: PipelineExecutor) -> None:
     SELECT * FROM step2
     """
     result = await executor.inspect_ctes(
-        pipeline_id="test",
+        workflow_id="test",
         sources=_csv_sources(),
         query=query,
         parameters={},
@@ -86,10 +86,10 @@ async def test_inspect_multiple_ctes(executor: PipelineExecutor) -> None:
 
 
 @pytest.mark.asyncio
-async def test_inspect_no_ctes(executor: PipelineExecutor) -> None:
+async def test_inspect_no_ctes(executor: WorkflowExecutor) -> None:
     query = "SELECT * FROM raw_data"
     result = await executor.inspect_ctes(
-        pipeline_id="test",
+        workflow_id="test",
         sources=_csv_sources(),
         query=query,
         parameters={},
@@ -101,23 +101,23 @@ async def test_inspect_no_ctes(executor: PipelineExecutor) -> None:
 
 @pytest.mark.asyncio
 async def test_inspect_ctes_api_endpoint(client: Any) -> None:
-    # Create a pipeline with sources and a CTE query
-    resp = client.post("/api/pipelines", json={"name": "CTE Test"})
+    # Create a workflow with sources and a CTE query
+    resp = client.post("/api/workflows", json={"name": "CTE Test"})
     assert resp.status_code == 201
-    pipeline_id = resp.json()["id"]
+    workflow_id = resp.json()["id"]
 
     # Upload a CSV file
     csv_path = FIXTURES_DIR / "sample_meter_data.csv"
     with open(csv_path, "rb") as f:
         resp = client.post(
-            f"/api/pipelines/{pipeline_id}/files",
+            f"/api/workflows/{workflow_id}/files",
             files={"file": ("sample_meter_data.csv", f, "text/csv")},
         )
     assert resp.status_code == 201
 
     # Add file source
     resp = client.post(
-        f"/api/pipelines/{pipeline_id}/sources",
+        f"/api/workflows/{workflow_id}/sources",
         json={
             "table_name": "raw_data",
             "type": "file",
@@ -135,11 +135,11 @@ async def test_inspect_ctes_api_endpoint(client: Any) -> None:
     )
     SELECT * FROM totals WHERE total > 40
     """
-    resp = client.put(f"/api/pipelines/{pipeline_id}", json={"query": cte_query})
+    resp = client.put(f"/api/workflows/{workflow_id}", json={"query": cte_query})
     assert resp.status_code == 200
 
     # Inspect CTEs
-    resp = client.post(f"/api/pipelines/{pipeline_id}/inspect-ctes", json={})
+    resp = client.post(f"/api/workflows/{workflow_id}/inspect-ctes", json={})
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "success"

@@ -1,7 +1,7 @@
 from app.models.base import Base
-from app.models.pipeline import Pipeline
 from app.models.run import RunHistory
 from app.models.source import Source
 from app.models.uploaded_file import UploadedFile
+from app.models.workflow import Workflow
 
-__all__ = ["Base", "Pipeline", "RunHistory", "Source", "UploadedFile"]
+__all__ = ["Base", "RunHistory", "Source", "UploadedFile", "Workflow"]

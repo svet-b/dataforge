@@ -17,7 +17,7 @@ class SourceUpdate(BaseModel):
 
 class SourceResponse(BaseModel):
     id: UUID
-    pipeline_id: UUID
+    workflow_id: UUID
     table_name: str
     type: str
     config: dict[str, Any]

@@ -10,15 +10,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
-    from app.models.pipeline import Pipeline
+    from app.models.workflow import Workflow
 
 
 class RunHistory(Base):
     __tablename__ = "run_history"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    pipeline_id: Mapped[str] = mapped_column(
-        String, ForeignKey("pipelines.id", ondelete="CASCADE"), nullable=False
+    workflow_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
     )
     parameters: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(Text, nullable=False)
@@ -33,4 +33,4 @@ class RunHistory(Base):
     error: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     node_timings: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
-    pipeline: Mapped[Pipeline] = relationship("Pipeline", back_populates="runs")
+    workflow: Mapped[Workflow] = relationship("Workflow", back_populates="runs")

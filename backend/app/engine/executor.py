@@ -11,7 +11,7 @@ from app.engine.cte_parser import extract_ctes
 from app.engine.duckdb_manager import DuckDBSession
 
 
-class PipelineExecutionError(Exception):
+class WorkflowExecutionError(Exception):
     def __init__(self, message: str, sql: str | None = None) -> None:
         self.message = message
         self.sql = sql
@@ -45,7 +45,7 @@ class CTEInspectionResult:
     error: dict[str, Any] | None
 
 
-class PipelineExecutor:
+class WorkflowExecutor:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.file_connector = FileConnector()
@@ -53,7 +53,7 @@ class PipelineExecutor:
 
     async def execute(
         self,
-        pipeline_id: str,
+        workflow_id: str,
         sources: list[dict[str, Any]],
         query: str,
         parameters: dict[str, Any],
@@ -93,7 +93,7 @@ class PipelineExecutor:
                 schema_info=schema_info,
             )
 
-        except PipelineExecutionError as e:
+        except WorkflowExecutionError as e:
             return ExecutionResult(
                 status="failed",
                 duration_ms=int((time.monotonic() - start_time) * 1000),
@@ -139,7 +139,7 @@ class PipelineExecutor:
 
     async def inspect_ctes(
         self,
-        pipeline_id: str,
+        workflow_id: str,
         sources: list[dict[str, Any]],
         query: str,
         parameters: dict[str, Any],

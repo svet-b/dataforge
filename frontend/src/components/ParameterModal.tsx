@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { PipelineParameter } from '@/types';
-import { usePipelineStore } from '@/stores/pipeline';
+import type { WorkflowParameter } from '@/types';
+import { useWorkflowStore } from '@/stores/workflow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -14,15 +14,15 @@ import {
 import { X } from 'lucide-react';
 
 interface ParameterModalProps {
-  pipelineId: string;
-  parameters: PipelineParameter[];
+  workflowId: string;
+  parameters: WorkflowParameter[];
   open: boolean;
   onClose: () => void;
 }
 
-export default function ParameterModal({ pipelineId, parameters, open, onClose }: ParameterModalProps) {
-  const updatePipelineParams = usePipelineStore((s) => s.updatePipelineParams);
-  const [rows, setRows] = useState<PipelineParameter[]>(
+export default function ParameterModal({ workflowId, parameters, open, onClose }: ParameterModalProps) {
+  const updateWorkflowParams = useWorkflowStore((s) => s.updateWorkflowParams);
+  const [rows, setRows] = useState<WorkflowParameter[]>(
     parameters.length > 0 ? parameters.map((p) => ({ ...p })) : [],
   );
   const [nameError, setNameError] = useState('');
@@ -35,7 +35,7 @@ export default function ParameterModal({ pipelineId, parameters, open, onClose }
     setRows(rows.filter((_, i) => i !== index));
   }
 
-  function updateRow(index: number, field: keyof PipelineParameter, value: string) {
+  function updateRow(index: number, field: keyof WorkflowParameter, value: string) {
     setRows(rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
   }
 
@@ -66,7 +66,7 @@ export default function ParameterModal({ pipelineId, parameters, open, onClose }
         default: r.default || null,
         description: r.description || null,
       }));
-    await updatePipelineParams(pipelineId, cleaned);
+    await updateWorkflowParams(workflowId, cleaned);
     onClose();
   }
 
@@ -74,7 +74,7 @@ export default function ParameterModal({ pipelineId, parameters, open, onClose }
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-xl" data-testid="parameter-modal">
         <DialogHeader>
-          <DialogTitle>Pipeline Parameters</DialogTitle>
+          <DialogTitle>Workflow Parameters</DialogTitle>
           <DialogDescription>Define parameters that can be provided at runtime.</DialogDescription>
         </DialogHeader>
 

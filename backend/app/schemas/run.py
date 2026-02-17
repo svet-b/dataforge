@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 class RunHistorySummaryResponse(BaseModel):
     id: UUID
-    pipeline_id: UUID
+    workflow_id: UUID
     parameters: dict[str, Any]
     status: str
     started_at: datetime
@@ -19,7 +19,7 @@ class RunHistorySummaryResponse(BaseModel):
 
 class RunHistoryResponse(BaseModel):
     id: UUID
-    pipeline_id: UUID
+    workflow_id: UUID
     parameters: dict[str, Any]
     status: str
     started_at: datetime

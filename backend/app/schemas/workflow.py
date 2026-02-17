@@ -6,37 +6,37 @@ from pydantic import BaseModel
 from app.schemas.source import SourceResponse
 
 
-class PipelineParameter(BaseModel):
+class WorkflowParameter(BaseModel):
     name: str
     type: str
     default: str | None = None
     description: str | None = None
 
 
-class PipelineCreate(BaseModel):
+class WorkflowCreate(BaseModel):
     name: str
     description: str | None = None
-    parameters: list[PipelineParameter] = []
+    parameters: list[WorkflowParameter] = []
 
 
-class PipelineUpdate(BaseModel):
+class WorkflowUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     query: str | None = None
-    parameters: list[PipelineParameter] | None = None
+    parameters: list[WorkflowParameter] | None = None
 
 
-class PipelineResponse(BaseModel):
+class WorkflowResponse(BaseModel):
     id: UUID
     name: str
     description: str | None
     query: str | None
-    parameters: list[PipelineParameter]
+    parameters: list[WorkflowParameter]
     created_at: datetime
     updated_at: datetime
 
 
-class PipelineSummaryResponse(BaseModel):
+class WorkflowSummaryResponse(BaseModel):
     id: UUID
     name: str
     description: str | None
@@ -45,5 +45,5 @@ class PipelineSummaryResponse(BaseModel):
     updated_at: datetime
 
 
-class PipelineDetailResponse(PipelineResponse):
+class WorkflowDetailResponse(WorkflowResponse):
     sources: list[SourceResponse]

@@ -9,7 +9,7 @@ interface CTEInspectionState {
   error: string | null;
   durationMs: number | null;
   cachedForRunId: string | null;
-  loadCteInspection: (pipelineId: string, runId: string | null, parameters?: Record<string, unknown>) => Promise<void>;
+  loadCteInspection: (workflowId: string, runId: string | null, parameters?: Record<string, unknown>) => Promise<void>;
   selectCte: (name: string) => void;
   reset: () => void;
 }
@@ -26,10 +26,10 @@ const initial = {
 export const useCteInspectionStore = create<CTEInspectionState>((set) => ({
   ...initial,
 
-  loadCteInspection: async (pipelineId, runId, parameters = {}) => {
+  loadCteInspection: async (workflowId, runId, parameters = {}) => {
     set({ ...initial, loading: true });
     try {
-      const result = await api.execution.inspectCtes(pipelineId, { parameters });
+      const result = await api.execution.inspectCtes(workflowId, { parameters });
       if (result.status === 'success') {
         set({
           loading: false,

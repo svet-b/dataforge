@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { PipelineParameter } from '@/types';
-import { usePipelineStore } from '@/stores/pipeline';
+import type { WorkflowParameter } from '@/types';
+import { useWorkflowStore } from '@/stores/workflow';
 import { useRunsStore } from '@/stores/runs';
 import { useResultsStore } from '@/stores/results';
 import { Button } from '@/components/ui/button';
@@ -15,15 +15,15 @@ import {
 } from '@/components/ui/dialog';
 
 interface RunDialogProps {
-  pipelineId: string;
-  parameters: PipelineParameter[];
+  workflowId: string;
+  parameters: WorkflowParameter[];
   open: boolean;
   onClose: () => void;
   onRunComplete: () => void;
 }
 
-export default function RunDialog({ pipelineId, parameters, open, onClose, onRunComplete }: RunDialogProps) {
-  const runPipeline = usePipelineStore((s) => s.runPipeline);
+export default function RunDialog({ workflowId, parameters, open, onClose, onRunComplete }: RunDialogProps) {
+  const runWorkflow = useWorkflowStore((s) => s.runWorkflow);
   const loadRuns = useRunsStore((s) => s.loadRuns);
   const setResults = useResultsStore((s) => s.setResults);
   const setError = useResultsStore((s) => s.setError);
@@ -46,13 +46,13 @@ export default function RunDialog({ pipelineId, parameters, open, onClose, onRun
       else params[p.name] = val;
     }
     try {
-      const result = await runPipeline(pipelineId, params);
+      const result = await runWorkflow(workflowId, params);
       if (result) {
         setResults(result);
       } else {
         setError('Run failed');
       }
-      await loadRuns(pipelineId);
+      await loadRuns(workflowId);
       onRunComplete();
       onClose();
     } finally {
@@ -64,7 +64,7 @@ export default function RunDialog({ pipelineId, parameters, open, onClose, onRun
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent data-testid="run-dialog">
         <DialogHeader>
-          <DialogTitle>Run Pipeline</DialogTitle>
+          <DialogTitle>Run Workflow</DialogTitle>
           <DialogDescription>Provide parameter values for this run.</DialogDescription>
         </DialogHeader>
 

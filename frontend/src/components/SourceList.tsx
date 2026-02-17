@@ -1,34 +1,34 @@
 import { useState } from 'react';
 import type { SourceType } from '@/types';
-import { usePipelineStore } from '@/stores/pipeline';
+import { useWorkflowStore } from '@/stores/workflow';
 import { deriveTableName } from '@/utils/tableName';
 import { X } from 'lucide-react';
 
 interface SourceListProps {
-  pipelineId: string;
+  workflowId: string;
 }
 
-export default function SourceList({ pipelineId }: SourceListProps) {
-  const pipeline = usePipelineStore((s) => s.pipeline);
-  const selectedSourceId = usePipelineStore((s) => s.selectedSourceId);
-  const addSource = usePipelineStore((s) => s.addSource);
-  const deleteSource = usePipelineStore((s) => s.deleteSource);
-  const selectSource = usePipelineStore((s) => s.selectSource);
+export default function SourceList({ workflowId }: SourceListProps) {
+  const workflow = useWorkflowStore((s) => s.workflow);
+  const selectedSourceId = useWorkflowStore((s) => s.selectedSourceId);
+  const addSource = useWorkflowStore((s) => s.addSource);
+  const deleteSource = useWorkflowStore((s) => s.deleteSource);
+  const selectSource = useWorkflowStore((s) => s.selectSource);
 
-  const sources = pipeline?.sources ?? [];
+  const sources = workflow?.sources ?? [];
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   function handleAdd(type: SourceType) {
     const existingNames = sources.map((s) => s.table_name);
     const prefix = type === 'file' ? 'file' : 'api';
     const tableName = deriveTableName(prefix, existingNames);
-    addSource(pipelineId, type, tableName);
+    addSource(workflowId, type, tableName);
     setShowAddMenu(false);
   }
 
   function handleDelete(e: React.MouseEvent, sourceId: string) {
     e.stopPropagation();
-    deleteSource(pipelineId, sourceId);
+    deleteSource(workflowId, sourceId);
   }
 
   function handleSelect(sourceId: string) {

@@ -11,22 +11,22 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models.pipeline import Pipeline
 from app.models.run import RunHistory
 from app.models.source import Source
 from app.models.uploaded_file import UploadedFile
-from app.schemas.pipeline import (
-    PipelineCreate,
-    PipelineDetailResponse,
-    PipelineResponse,
-    PipelineSummaryResponse,
-    PipelineUpdate,
-)
+from app.models.workflow import Workflow
 from app.schemas.run import RunHistoryResponse, RunHistorySummaryResponse
 from app.schemas.source import SourceCreate, SourceResponse, SourceUpdate
 from app.schemas.uploaded_file import UploadedFileResponse
+from app.schemas.workflow import (
+    WorkflowCreate,
+    WorkflowDetailResponse,
+    WorkflowResponse,
+    WorkflowSummaryResponse,
+    WorkflowUpdate,
+)
 
-router = APIRouter(prefix="/api/pipelines", tags=["pipelines"])
+router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
 FILE_TYPE_MAP = {
     ".csv": "csv",
@@ -39,20 +39,20 @@ FILE_TYPE_MAP = {
 TABLE_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
-def _get_pipeline_or_404(pipeline_id: str, db: Session) -> Pipeline:
-    pipeline = db.get(Pipeline, pipeline_id)
-    if not pipeline:
-        raise HTTPException(status_code=404, detail="Pipeline not found")
-    return pipeline
+def _get_workflow_or_404(workflow_id: str, db: Session) -> Workflow:
+    workflow = db.get(Workflow, workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    return workflow
 
 
-def _touch_pipeline(pipeline: Pipeline) -> None:
-    pipeline.updated_at = datetime.now(UTC).isoformat()
+def _touch_workflow(workflow: Workflow) -> None:
+    workflow.updated_at = datetime.now(UTC).isoformat()
 
 
 def _validate_table_name(
     name: str,
-    pipeline_id: str,
+    workflow_id: str,
     db: Session,
     exclude_source_id: str | None = None,
 ) -> str | None:
@@ -60,209 +60,209 @@ def _validate_table_name(
     if not TABLE_NAME_PATTERN.match(name):
         return f"Invalid table name '{name}'. Must be a valid SQL identifier."
     query = db.query(Source).filter(
-        Source.pipeline_id == pipeline_id,
+        Source.workflow_id == workflow_id,
         Source.table_name == name,
     )
     if exclude_source_id:
         query = query.filter(Source.id != exclude_source_id)
     if query.first():
-        return f"A source with table_name '{name}' already exists in this pipeline"
+        return f"A source with table_name '{name}' already exists in this workflow"
     return None
 
 
-# ── Pipeline CRUD ──────────────────────────────────────────────
+# ── Workflow CRUD ──────────────────────────────────────────────
 
 
-@router.get("", response_model=list[PipelineSummaryResponse])
-def list_pipelines(db: Session = Depends(get_db)) -> list[PipelineSummaryResponse]:
-    pipelines = db.query(Pipeline).order_by(Pipeline.updated_at.desc()).all()
+@router.get("", response_model=list[WorkflowSummaryResponse])
+def list_workflows(db: Session = Depends(get_db)) -> list[WorkflowSummaryResponse]:
+    workflows = db.query(Workflow).order_by(Workflow.updated_at.desc()).all()
     return [
-        PipelineSummaryResponse(
-            id=p.id,
-            name=p.name,
-            description=p.description,
-            source_count=len(p.sources),
-            created_at=p.created_at,
-            updated_at=p.updated_at,
+        WorkflowSummaryResponse(
+            id=w.id,
+            name=w.name,
+            description=w.description,
+            source_count=len(w.sources),
+            created_at=w.created_at,
+            updated_at=w.updated_at,
         )
-        for p in pipelines
+        for w in workflows
     ]
 
 
-@router.post("", response_model=PipelineResponse, status_code=201)
-def create_pipeline(body: PipelineCreate, db: Session = Depends(get_db)) -> PipelineResponse:
-    pipeline = Pipeline(
+@router.post("", response_model=WorkflowResponse, status_code=201)
+def create_workflow(body: WorkflowCreate, db: Session = Depends(get_db)) -> WorkflowResponse:
+    workflow = Workflow(
         name=body.name,
         description=body.description,
         parameters=[p.model_dump() for p in body.parameters],
     )
-    db.add(pipeline)
+    db.add(workflow)
     db.commit()
-    db.refresh(pipeline)
-    return PipelineResponse(
-        id=pipeline.id,
-        name=pipeline.name,
-        description=pipeline.description,
-        query=pipeline.query,
-        parameters=pipeline.parameters,
-        created_at=pipeline.created_at,
-        updated_at=pipeline.updated_at,
+    db.refresh(workflow)
+    return WorkflowResponse(
+        id=workflow.id,
+        name=workflow.name,
+        description=workflow.description,
+        query=workflow.query,
+        parameters=workflow.parameters,
+        created_at=workflow.created_at,
+        updated_at=workflow.updated_at,
     )
 
 
-@router.get("/{pipeline_id}", response_model=PipelineDetailResponse)
-def get_pipeline(pipeline_id: str, db: Session = Depends(get_db)) -> PipelineDetailResponse:
-    pipeline = _get_pipeline_or_404(pipeline_id, db)
-    return PipelineDetailResponse(
-        id=pipeline.id,
-        name=pipeline.name,
-        description=pipeline.description,
-        query=pipeline.query,
-        parameters=pipeline.parameters,
-        created_at=pipeline.created_at,
-        updated_at=pipeline.updated_at,
+@router.get("/{workflow_id}", response_model=WorkflowDetailResponse)
+def get_workflow(workflow_id: str, db: Session = Depends(get_db)) -> WorkflowDetailResponse:
+    workflow = _get_workflow_or_404(workflow_id, db)
+    return WorkflowDetailResponse(
+        id=workflow.id,
+        name=workflow.name,
+        description=workflow.description,
+        query=workflow.query,
+        parameters=workflow.parameters,
+        created_at=workflow.created_at,
+        updated_at=workflow.updated_at,
         sources=[
             SourceResponse(
                 id=s.id,
-                pipeline_id=s.pipeline_id,
+                workflow_id=s.workflow_id,
                 table_name=s.table_name,
                 type=s.type,
                 config=s.config,
             )
-            for s in pipeline.sources
+            for s in workflow.sources
         ],
     )
 
 
-@router.put("/{pipeline_id}", response_model=PipelineResponse)
-def update_pipeline(
-    pipeline_id: str, body: PipelineUpdate, db: Session = Depends(get_db)
-) -> PipelineResponse:
-    pipeline = _get_pipeline_or_404(pipeline_id, db)
+@router.put("/{workflow_id}", response_model=WorkflowResponse)
+def update_workflow(
+    workflow_id: str, body: WorkflowUpdate, db: Session = Depends(get_db)
+) -> WorkflowResponse:
+    workflow = _get_workflow_or_404(workflow_id, db)
     if body.name is not None:
-        pipeline.name = body.name
+        workflow.name = body.name
     if body.description is not None:
-        pipeline.description = body.description
+        workflow.description = body.description
     if body.query is not None:
-        pipeline.query = body.query
+        workflow.query = body.query
     if body.parameters is not None:
-        pipeline.parameters = [p.model_dump() for p in body.parameters]
-    _touch_pipeline(pipeline)
+        workflow.parameters = [p.model_dump() for p in body.parameters]
+    _touch_workflow(workflow)
     db.commit()
-    db.refresh(pipeline)
-    return PipelineResponse(
-        id=pipeline.id,
-        name=pipeline.name,
-        description=pipeline.description,
-        query=pipeline.query,
-        parameters=pipeline.parameters,
-        created_at=pipeline.created_at,
-        updated_at=pipeline.updated_at,
+    db.refresh(workflow)
+    return WorkflowResponse(
+        id=workflow.id,
+        name=workflow.name,
+        description=workflow.description,
+        query=workflow.query,
+        parameters=workflow.parameters,
+        created_at=workflow.created_at,
+        updated_at=workflow.updated_at,
     )
 
 
-@router.delete("/{pipeline_id}", status_code=204)
-def delete_pipeline(pipeline_id: str, db: Session = Depends(get_db)) -> None:
-    pipeline = _get_pipeline_or_404(pipeline_id, db)
+@router.delete("/{workflow_id}", status_code=204)
+def delete_workflow(workflow_id: str, db: Session = Depends(get_db)) -> None:
+    workflow = _get_workflow_or_404(workflow_id, db)
     # Clean up uploaded files from disk
-    for f in pipeline.uploaded_files:
+    for f in workflow.uploaded_files:
         try:
             os.remove(f.storage_path)
         except OSError:
             pass
-    db.delete(pipeline)
+    db.delete(workflow)
     db.commit()
 
 
 # ── Source CRUD ────────────────────────────────────────────────
 
 
-@router.post("/{pipeline_id}/sources", response_model=SourceResponse, status_code=201)
+@router.post("/{workflow_id}/sources", response_model=SourceResponse, status_code=201)
 def add_source(
-    pipeline_id: str, body: SourceCreate, db: Session = Depends(get_db)
+    workflow_id: str, body: SourceCreate, db: Session = Depends(get_db)
 ) -> SourceResponse:
-    pipeline = _get_pipeline_or_404(pipeline_id, db)
-    error = _validate_table_name(body.table_name, pipeline_id, db)
+    workflow = _get_workflow_or_404(workflow_id, db)
+    error = _validate_table_name(body.table_name, workflow_id, db)
     if error:
         status = 409 if "already exists" in error else 400
         raise HTTPException(status_code=status, detail=error)
     source = Source(
-        pipeline_id=pipeline_id,
+        workflow_id=workflow_id,
         table_name=body.table_name,
         type=body.type,
         config=body.config,
     )
     db.add(source)
-    _touch_pipeline(pipeline)
+    _touch_workflow(workflow)
     db.commit()
     db.refresh(source)
     return SourceResponse(
         id=source.id,
-        pipeline_id=source.pipeline_id,
+        workflow_id=source.workflow_id,
         table_name=source.table_name,
         type=source.type,
         config=source.config,
     )
 
 
-@router.put("/{pipeline_id}/sources/{source_id}", response_model=SourceResponse)
+@router.put("/{workflow_id}/sources/{source_id}", response_model=SourceResponse)
 def update_source(
-    pipeline_id: str,
+    workflow_id: str,
     source_id: str,
     body: SourceUpdate,
     db: Session = Depends(get_db),
 ) -> SourceResponse:
-    pipeline = _get_pipeline_or_404(pipeline_id, db)
+    workflow = _get_workflow_or_404(workflow_id, db)
     source = db.get(Source, source_id)
-    if not source or source.pipeline_id != pipeline_id:
+    if not source or source.workflow_id != workflow_id:
         raise HTTPException(status_code=404, detail="Source not found")
     if body.table_name is not None:
-        error = _validate_table_name(body.table_name, pipeline_id, db, exclude_source_id=source_id)
+        error = _validate_table_name(body.table_name, workflow_id, db, exclude_source_id=source_id)
         if error:
             status = 409 if "already exists" in error else 400
             raise HTTPException(status_code=status, detail=error)
         source.table_name = body.table_name
     if body.config is not None:
         source.config = body.config
-    _touch_pipeline(pipeline)
+    _touch_workflow(workflow)
     db.commit()
     db.refresh(source)
     return SourceResponse(
         id=source.id,
-        pipeline_id=source.pipeline_id,
+        workflow_id=source.workflow_id,
         table_name=source.table_name,
         type=source.type,
         config=source.config,
     )
 
 
-@router.delete("/{pipeline_id}/sources/{source_id}", status_code=204)
-def delete_source(pipeline_id: str, source_id: str, db: Session = Depends(get_db)) -> None:
-    pipeline = _get_pipeline_or_404(pipeline_id, db)
+@router.delete("/{workflow_id}/sources/{source_id}", status_code=204)
+def delete_source(workflow_id: str, source_id: str, db: Session = Depends(get_db)) -> None:
+    workflow = _get_workflow_or_404(workflow_id, db)
     source = db.get(Source, source_id)
-    if not source or source.pipeline_id != pipeline_id:
+    if not source or source.workflow_id != workflow_id:
         raise HTTPException(status_code=404, detail="Source not found")
     db.delete(source)
-    _touch_pipeline(pipeline)
+    _touch_workflow(workflow)
     db.commit()
 
 
 # ── File Upload ────────────────────────────────────────────────
 
 
-@router.post("/{pipeline_id}/files", response_model=UploadedFileResponse, status_code=201)
+@router.post("/{workflow_id}/files", response_model=UploadedFileResponse, status_code=201)
 async def upload_file(
-    pipeline_id: str,
+    workflow_id: str,
     file: UploadFile,
     db: Session = Depends(get_db),
 ) -> UploadedFileResponse:
-    _get_pipeline_or_404(pipeline_id, db)
+    _get_workflow_or_404(workflow_id, db)
     filename = file.filename or "unknown"
     ext = Path(filename).suffix.lower()
     file_type = FILE_TYPE_MAP.get(ext, "csv")
 
     file_id = str(uuid.uuid4())
-    dir_path = Path(settings.data_dir) / "files" / pipeline_id
+    dir_path = Path(settings.data_dir) / "files" / workflow_id
     dir_path.mkdir(parents=True, exist_ok=True)
     storage_path = dir_path / f"{file_id}_{filename}"
 
@@ -271,7 +271,7 @@ async def upload_file(
 
     record = UploadedFile(
         id=file_id,
-        pipeline_id=pipeline_id,
+        workflow_id=workflow_id,
         filename=filename,
         file_type=file_type,
         storage_path=str(storage_path),
@@ -281,21 +281,21 @@ async def upload_file(
     db.refresh(record)
     return UploadedFileResponse(
         id=record.id,
-        pipeline_id=record.pipeline_id,
+        workflow_id=record.workflow_id,
         filename=record.filename,
         file_type=record.file_type,
         uploaded_at=record.uploaded_at,
     )
 
 
-@router.get("/{pipeline_id}/files", response_model=list[UploadedFileResponse])
-def list_files(pipeline_id: str, db: Session = Depends(get_db)) -> list[UploadedFileResponse]:
-    _get_pipeline_or_404(pipeline_id, db)
-    files = db.query(UploadedFile).filter(UploadedFile.pipeline_id == pipeline_id).all()
+@router.get("/{workflow_id}/files", response_model=list[UploadedFileResponse])
+def list_files(workflow_id: str, db: Session = Depends(get_db)) -> list[UploadedFileResponse]:
+    _get_workflow_or_404(workflow_id, db)
+    files = db.query(UploadedFile).filter(UploadedFile.workflow_id == workflow_id).all()
     return [
         UploadedFileResponse(
             id=f.id,
-            pipeline_id=f.pipeline_id,
+            workflow_id=f.workflow_id,
             filename=f.filename,
             file_type=f.file_type,
             uploaded_at=f.uploaded_at,
@@ -304,11 +304,11 @@ def list_files(pipeline_id: str, db: Session = Depends(get_db)) -> list[Uploaded
     ]
 
 
-@router.delete("/{pipeline_id}/files/{file_id}", status_code=204)
-def delete_file(pipeline_id: str, file_id: str, db: Session = Depends(get_db)) -> None:
-    _get_pipeline_or_404(pipeline_id, db)
+@router.delete("/{workflow_id}/files/{file_id}", status_code=204)
+def delete_file(workflow_id: str, file_id: str, db: Session = Depends(get_db)) -> None:
+    _get_workflow_or_404(workflow_id, db)
     record = db.get(UploadedFile, file_id)
-    if not record or record.pipeline_id != pipeline_id:
+    if not record or record.workflow_id != workflow_id:
         raise HTTPException(status_code=404, detail="File not found")
     try:
         os.remove(record.storage_path)
@@ -321,16 +321,16 @@ def delete_file(pipeline_id: str, file_id: str, db: Session = Depends(get_db)) -
 # ── Run History ────────────────────────────────────────────────
 
 
-@router.get("/{pipeline_id}/runs", response_model=list[RunHistorySummaryResponse])
+@router.get("/{workflow_id}/runs", response_model=list[RunHistorySummaryResponse])
 def list_runs(
-    pipeline_id: str,
+    workflow_id: str,
     limit: int = Query(default=20, le=100),
     db: Session = Depends(get_db),
 ) -> list[RunHistorySummaryResponse]:
-    _get_pipeline_or_404(pipeline_id, db)
+    _get_workflow_or_404(workflow_id, db)
     runs = (
         db.query(RunHistory)
-        .filter(RunHistory.pipeline_id == pipeline_id)
+        .filter(RunHistory.workflow_id == workflow_id)
         .order_by(RunHistory.started_at.desc())
         .limit(limit)
         .all()
@@ -338,7 +338,7 @@ def list_runs(
     return [
         RunHistorySummaryResponse(
             id=r.id,
-            pipeline_id=r.pipeline_id,
+            workflow_id=r.workflow_id,
             parameters=r.parameters,
             status=r.status,
             started_at=r.started_at,
@@ -351,15 +351,17 @@ def list_runs(
     ]
 
 
-@router.get("/{pipeline_id}/runs/{run_id}", response_model=RunHistoryResponse)
-def get_run(pipeline_id: str, run_id: str, db: Session = Depends(get_db)) -> RunHistoryResponse:
-    _get_pipeline_or_404(pipeline_id, db)
+@router.get("/{workflow_id}/runs/{run_id}", response_model=RunHistoryResponse)
+def get_run(
+    workflow_id: str, run_id: str, db: Session = Depends(get_db)
+) -> RunHistoryResponse:
+    _get_workflow_or_404(workflow_id, db)
     run = db.get(RunHistory, run_id)
-    if not run or run.pipeline_id != pipeline_id:
+    if not run or run.workflow_id != workflow_id:
         raise HTTPException(status_code=404, detail="Run not found")
     return RunHistoryResponse(
         id=run.id,
-        pipeline_id=run.pipeline_id,
+        workflow_id=run.workflow_id,
         parameters=run.parameters,
         status=run.status,
         started_at=run.started_at,

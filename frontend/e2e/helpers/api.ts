@@ -17,7 +17,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 	return res.json();
 }
 
-export interface PipelineResult {
+export interface WorkflowResult {
 	id: string;
 	name: string;
 	description: string | null;
@@ -26,46 +26,46 @@ export interface PipelineResult {
 
 export interface SourceResult {
 	id: string;
-	pipeline_id: string;
+	workflow_id: string;
 	table_name: string;
 	type: string;
 	config: Record<string, unknown>;
 }
 
-export async function createPipeline(
+export async function createWorkflow(
 	name: string,
 	description?: string
-): Promise<PipelineResult> {
-	return request<PipelineResult>('POST', '/pipelines', { name, description });
+): Promise<WorkflowResult> {
+	return request<WorkflowResult>('POST', '/workflows', { name, description });
 }
 
-export async function deletePipeline(id: string): Promise<void> {
-	return request<void>('DELETE', `/pipelines/${id}`);
+export async function deleteWorkflow(id: string): Promise<void> {
+	return request<void>('DELETE', `/workflows/${id}`);
 }
 
-export async function deleteAllPipelines(): Promise<void> {
-	const pipelines = await request<PipelineResult[]>('GET', '/pipelines');
-	for (const p of pipelines) {
-		await deletePipeline(p.id);
+export async function deleteAllWorkflows(): Promise<void> {
+	const workflows = await request<WorkflowResult[]>('GET', '/workflows');
+	for (const w of workflows) {
+		await deleteWorkflow(w.id);
 	}
 }
 
 export async function addSource(
-	pipelineId: string,
+	workflowId: string,
 	type: string,
 	tableName: string,
 	config?: Record<string, unknown>
 ): Promise<SourceResult> {
-	return request<SourceResult>('POST', `/pipelines/${pipelineId}/sources`, {
+	return request<SourceResult>('POST', `/workflows/${workflowId}/sources`, {
 		type,
 		table_name: tableName,
 		config: config ?? {},
 	});
 }
 
-export async function updatePipeline(
-	pipelineId: string,
+export async function updateWorkflow(
+	workflowId: string,
 	data: { name?: string; query?: string }
-): Promise<PipelineResult> {
-	return request<PipelineResult>('PUT', `/pipelines/${pipelineId}`, data);
+): Promise<WorkflowResult> {
+	return request<WorkflowResult>('PUT', `/workflows/${workflowId}`, data);
 }

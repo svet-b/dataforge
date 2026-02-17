@@ -15,7 +15,7 @@ _provider = create_llm_provider(settings)
 class GenerateSQLRequest(BaseModel):
     prompt: str
     available_tables: list[dict[str, object]]
-    pipeline_parameters: list[dict[str, object]]
+    workflow_parameters: list[dict[str, object]]
     conversation_history: list[dict[str, str]] = []
     current_query: str | None = None
 
@@ -35,7 +35,7 @@ async def generate_sql(body: GenerateSQLRequest) -> GenerateSQLResponse:
         )
 
     system_prompt = build_system_prompt(
-        body.available_tables, body.pipeline_parameters, body.current_query
+        body.available_tables, body.workflow_parameters, body.current_query
     )
 
     if body.conversation_history:
