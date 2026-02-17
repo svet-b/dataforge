@@ -2,6 +2,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # Logging
+    log_level: str = "INFO"
+
     # Database
     database_url: str = "sqlite:///data/dataforge.db"
 
