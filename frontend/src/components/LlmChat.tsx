@@ -40,8 +40,8 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
     }).catch(() => setLlmAvailable(false));
   }, []);
 
-  const loadSchemas = useCallback(async () => {
-    if (schemasLoaded) return;
+  const loadSchemas = useCallback(async (): Promise<TableSchema[]> => {
+    if (schemasLoaded) return schemas;
     const sources = workflow?.sources ?? [];
     try {
       const results = await Promise.all(
@@ -56,10 +56,12 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
       );
       setSchemas(results);
       setSchemasLoaded(true);
+      return results;
     } catch {
       // schemas will remain empty; LLM can still generate SQL without them
+      return schemas;
     }
-  }, [schemasLoaded, workflow?.sources, workflowId]);
+  }, [schemasLoaded, schemas, workflow?.sources, workflowId]);
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
@@ -80,7 +82,7 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
     const prompt = inputValue.trim();
     if (!prompt || loading) return;
 
-    await loadSchemas();
+    const loadedSchemas = await loadSchemas();
 
     setInputValue('');
     setError('');
@@ -95,7 +97,7 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
 
       const result = await api.llm.generateSql({
         prompt,
-        available_tables: schemas,
+        available_tables: loadedSchemas,
         workflow_parameters: parameters as WorkflowParameter[],
         conversation_history: history.length > 0 ? history : [],
         current_query: currentQuery,
@@ -109,7 +111,7 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
         finalSql,
         finalExplanation,
         newMessages,
-        schemas,
+        loadedSchemas,
         parameters as WorkflowParameter[],
         currentQuery,
       );
