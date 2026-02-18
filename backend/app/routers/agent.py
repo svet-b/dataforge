@@ -37,8 +37,11 @@ async def _create_agent_context(
     sources: list[dict[str, Any]],
     parameters: dict[str, Any],
     current_query: str | None,
-) -> AgentContext:
-    """Create a DuckDB session with sources loaded for the agent."""
+) -> tuple[AgentContext, list[dict[str, object]]]:
+    """Create a DuckDB session with sources loaded for the agent.
+
+    Returns (context, table_schemas) where table_schemas is ready for the system prompt.
+    """
     session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
 
     # Set parameters as DuckDB variables
@@ -52,11 +55,19 @@ async def _create_agent_context(
         await executor._load_source(session, source, parameters)
         table_names.append(source["table_name"])
 
-    return AgentContext(
+    # Compute schemas once — embedded in system prompt, no tool call needed
+    table_schemas: list[dict[str, object]] = []
+    for name in table_names:
+        cols = session.get_table_schema(name)
+        row_count = session.get_row_count(name)
+        table_schemas.append({"name": name, "columns": cols, "row_count": row_count})
+
+    ctx = AgentContext(
         session=session,
         table_names=table_names,
         current_query=current_query,
     )
+    return ctx, table_schemas
 
 
 async def _event_stream(
@@ -93,15 +104,15 @@ async def agent_chat(
     # Use current_query from request body, fall back to workflow query
     current_query = body.current_query if body.current_query is not None else query
 
-    ctx = await _create_agent_context(sources, parameters, current_query)
+    ctx, table_schemas = await _create_agent_context(sources, parameters, current_query)
 
-    # Build parameter info for the system prompt
     param_info: list[dict[str, object]] = []
     for p in workflow.parameters:
         assert isinstance(p, dict)
         param_info.append(p)
 
     system_prompt = build_agent_system_prompt(
+        tables=table_schemas,
         parameters=param_info,
         current_query=current_query,
         conversation_summary=body.conversation_summary,

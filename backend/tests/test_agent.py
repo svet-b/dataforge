@@ -4,10 +4,17 @@ import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import anthropic
 import pytest
 
 from app.engine.duckdb_manager import DuckDBSession
-from app.llm.agent import AgentContext, _execute_tool, run_agent
+from app.llm.agent import (
+    MAX_TOOL_RESULT_CHARS,
+    AgentContext,
+    _execute_tool,
+    _truncate_result,
+    run_agent,
+)
 from app.llm.events import AgentEvent
 
 # ── Helpers ──────────────────────────────────────────────────
@@ -65,30 +72,6 @@ def _make_response(blocks: list[MagicMock], stop_reason: str = "tool_use") -> Ma
 
 
 # ── Tool executor tests (real DuckDB) ───────────────────────
-
-
-class TestGetSchemas:
-    def test_returns_table_info(self) -> None:
-        ctx = _make_ctx({"orders": [{"id": "1", "amount": "100"}]})
-        result = json.loads(_execute_tool(ctx, "get_schemas", {}))
-        assert len(result) == 1
-        assert result[0]["table"] == "orders"
-        assert result[0]["row_count"] == 1
-        assert len(result[0]["columns"]) == 2
-        ctx.session.close()
-
-    def test_multiple_tables(self) -> None:
-        ctx = _make_ctx(
-            {
-                "orders": [{"id": "1"}],
-                "customers": [{"name": "Alice"}],
-            }
-        )
-        result = json.loads(_execute_tool(ctx, "get_schemas", {}))
-        assert len(result) == 2
-        names = {r["table"] for r in result}
-        assert names == {"orders", "customers"}
-        ctx.session.close()
 
 
 class TestSampleData:
@@ -159,6 +142,30 @@ class TestSubmitSql:
         ctx.session.close()
 
 
+# ── Result truncation ────────────────────────────────────────
+
+
+def test_truncate_result_under_limit() -> None:
+    short = "x" * 100
+    assert _truncate_result(short, max_chars=200) == short
+
+
+def test_truncate_result_over_limit() -> None:
+    long_result = "x" * 20_000
+    truncated = _truncate_result(long_result, max_chars=MAX_TOOL_RESULT_CHARS)
+    assert len(truncated) < 20_000
+    assert "TRUNCATED" in truncated
+
+
+def test_truncate_result_preserves_newline_boundary() -> None:
+    lines = "\n".join(["line"] * 2000)  # lots of short lines
+    truncated = _truncate_result(lines, max_chars=MAX_TOOL_RESULT_CHARS)
+    assert "TRUNCATED" in truncated
+    # Should end at a newline (not mid-line), so last char before note is \n
+    before_note = truncated[: truncated.rfind("\n[...")]
+    assert not before_note.endswith("lin")  # not mid-word
+
+
 # ── Agent loop tests (mocked Claude) ────────────────────────
 
 
@@ -224,6 +231,31 @@ async def test_agent_multi_step() -> None:
     assert "tool_result" in types
     assert "result" in types
     assert events[-1].type == "result"
+    ctx.session.close()
+
+
+@pytest.mark.asyncio
+async def test_agent_bad_request_yields_error() -> None:
+    """Context-too-long from Anthropic → graceful error event, not a crash."""
+    ctx = _make_ctx({"t": [{"x": "1"}]})
+    provider = AsyncMock()
+
+    # Simulate context-window exceeded error
+    provider.generate_with_tools = AsyncMock(
+        side_effect=anthropic.BadRequestError(
+            message="prompt is too long: 201447 tokens > 200000 maximum",
+            response=MagicMock(status_code=400),
+            body={"type": "error", "error": {"type": "invalid_request_error"}},
+        )
+    )
+
+    events: list[AgentEvent] = []
+    async for event in run_agent(provider, "system", "do something", ctx):
+        events.append(event)
+
+    assert len(events) == 1
+    assert events[0].type == "error"
+    assert "context window" in events[0].data["message"].lower()
     ctx.session.close()
 
 

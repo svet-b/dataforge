@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Any
 
+import anthropic
 import duckdb
 from anthropic.types import MessageParam, ToolParam, ToolResultBlockParam, ToolUseBlock
 
@@ -25,22 +26,14 @@ from app.llm.events import (
 
 logger = logging.getLogger(__name__)
 
-MAX_ITERATIONS = 15
-SQL_TIMEOUT_SECONDS = 10
+MAX_ITERATIONS = 20
+SQL_TIMEOUT_SECONDS = 60
 MAX_RESULT_ROWS = 50
+# Hard cap on tool result strings added to message history (~2k tokens).
+# Prevents runaway context growth from wide/nested query results (e.g. DuckDB LIST columns).
+MAX_TOOL_RESULT_CHARS = 8_000
 
 AGENT_TOOLS: list[ToolParam] = [
-    {
-        "name": "get_schemas",
-        "description": (
-            "Get the schemas (column names and types) for all available source tables."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-        },
-    },
     {
         "name": "sample_data",
         "description": "Preview rows from a source table to understand its contents.",
@@ -131,6 +124,27 @@ class AgentContext:
     parameters: list[dict[str, object]] = field(default_factory=list)
 
 
+def _truncate_result(result: str, max_chars: int = MAX_TOOL_RESULT_CHARS) -> str:
+    """Truncate a tool result string to stay within the context budget.
+
+    When the result exceeds the limit, the raw string is cut and a note is appended
+    so the model knows data was omitted.
+    """
+    if len(result) <= max_chars:
+        return result
+    logger.warning(
+        "Tool result truncated: %d chars → %d chars", len(result), max_chars
+    )
+    # Trim to slightly under the limit to leave room for the note
+    trimmed = result[:max_chars - 120]
+    # Best-effort: trim to last complete line so JSON is less mangled
+    last_newline = trimmed.rfind("\n")
+    if last_newline > max_chars // 2:
+        trimmed = trimmed[:last_newline]
+    note = f"\n[... TRUNCATED — result exceeded {max_chars} chars. Use a more selective query.]"
+    return trimmed + note
+
+
 def _json_safe(obj: Any) -> Any:
     """Convert non-JSON-serializable values for tool results."""
     if isinstance(obj, dict):
@@ -148,20 +162,6 @@ def _json_safe(obj: Any) -> Any:
 
 def _execute_tool(ctx: AgentContext, tool_name: str, tool_input: dict[str, Any]) -> str:
     """Execute a tool and return the result as a string."""
-    if tool_name == "get_schemas":
-        schemas: list[dict[str, Any]] = []
-        for table_name in ctx.table_names:
-            cols = ctx.session.get_table_schema(table_name)
-            row_count = ctx.session.get_row_count(table_name)
-            schemas.append(
-                {
-                    "table": table_name,
-                    "columns": cols,
-                    "row_count": row_count,
-                }
-            )
-        return json.dumps(schemas, indent=2)
-
     if tool_name == "sample_data":
         table_name = tool_input["table_name"]
         limit = min(tool_input.get("limit", 5), MAX_RESULT_ROWS)
@@ -219,7 +219,20 @@ async def run_agent(
     messages: list[MessageParam] = [{"role": "user", "content": user_message}]
 
     for iteration in range(1, MAX_ITERATIONS + 1):
-        response = await provider.generate_with_tools(system_prompt, messages, AGENT_TOOLS)
+        try:
+            response = await provider.generate_with_tools(system_prompt, messages, AGENT_TOOLS)
+        except anthropic.BadRequestError as e:
+            # Most likely cause: context window exceeded despite per-result truncation.
+            logger.error("Anthropic BadRequestError in agent loop: %s", e)
+            yield error_event(
+                f"Request too large for the model's context window. "
+                f"Try a simpler query or fewer iterations. ({e.message})"
+            )
+            return
+        except anthropic.APIError as e:
+            logger.error("Anthropic API error in agent loop: %s", e)
+            yield error_event(f"API error: {e.message}")
+            return
 
         # Collect text blocks and tool use blocks
         text_parts: list[str] = []
@@ -280,13 +293,17 @@ async def run_agent(
                 result_str = json.dumps({"error": str(e)})
             duration_ms = int((time.monotonic() - start) * 1000)
 
+            # Truncate before adding to message history to keep context bounded.
+            # The full result is still emitted via SSE for the UI.
+            history_result = _truncate_result(result_str)
+
             yield tool_result_event(tool_name, result_str, duration_ms, iteration)
 
             tool_results.append(
                 {
                     "type": "tool_result",
                     "tool_use_id": tool_use.id,
-                    "content": result_str,
+                    "content": history_result,
                 }
             )
 
