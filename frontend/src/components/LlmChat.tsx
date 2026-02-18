@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ApiError } from '@/api/client';
+import { api } from '@/api/client';
+import { streamAgentChat } from '@/api/client';
 import { useWorkflowStore } from '@/stores/workflow';
-import type { TableSchema, WorkflowParameter } from '@/types';
+import type { AgentMessage, AgentToolStep } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
-
-const MAX_VALIDATION_RETRIES = 2;
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  sql?: string;
-}
+import { ChevronDown, ChevronRight, Loader2, Square } from 'lucide-react';
 
 interface LlmChatProps {
   workflowId: string;
@@ -21,17 +14,16 @@ interface LlmChatProps {
 
 export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
   const workflow = useWorkflowStore((s) => s.workflow);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loadingText, setLoadingText] = useState('Generating SQL...');
-  const [error, setError] = useState('');
-  const [schemas, setSchemas] = useState<TableSchema[]>([]);
-  const [schemasLoaded, setSchemasLoaded] = useState(false);
+  const [currentTool, setCurrentTool] = useState<string | null>(null);
+  const [pendingSteps, setPendingSteps] = useState<AgentToolStep[]>([]);
   const [llmAvailable, setLlmAvailable] = useState(true);
+  const [lastResult, setLastResult] = useState<{ sql: string; explanation: string } | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const parameters = workflow?.parameters ?? [];
   const currentQuery = workflow?.query ?? null;
 
   useEffect(() => {
@@ -40,156 +32,110 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
     }).catch(() => setLlmAvailable(false));
   }, []);
 
-  const loadSchemas = useCallback(async (): Promise<TableSchema[]> => {
-    if (schemasLoaded) return schemas;
-    const sources = workflow?.sources ?? [];
-    try {
-      const results = await Promise.all(
-        sources.map(async (s) => {
-          try {
-            const schema = await api.sources.schema(workflowId, s.id);
-            return { name: s.table_name, columns: schema.columns };
-          } catch {
-            return { name: s.table_name, columns: [] };
-          }
-        }),
-      );
-      setSchemas(results);
-      setSchemasLoaded(true);
-      return results;
-    } catch {
-      // schemas will remain empty; LLM can still generate SQL without them
-      return schemas;
-    }
-  }, [schemasLoaded, schemas, workflow?.sources, workflowId]);
-
-  function scrollToBottom() {
+  const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       if (chatContainerRef.current) {
         chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
       }
     });
+  }, []);
+
+  function stopGeneration() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+    setCurrentTool(null);
   }
 
-  function buildHistory(msgs: ChatMessage[]) {
-    return msgs.map((m) => ({
-      role: m.role,
-      content: m.role === 'assistant' && m.sql ? `\`\`\`sql\n${m.sql}\n\`\`\`\n\nExplanation: ${m.content}` : m.content,
-    }));
-  }
-
-  async function sendMessage() {
+  function sendMessage() {
     const prompt = inputValue.trim();
     if (!prompt || loading) return;
 
-    const loadedSchemas = await loadSchemas();
-
     setInputValue('');
-    setError('');
-    const newMessages: ChatMessage[] = [...messages, { role: 'user', content: prompt }];
-    setMessages(newMessages);
+    const userMsg: AgentMessage = { role: 'user', content: prompt };
+    setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
-    setLoadingText('Generating SQL...');
+    setCurrentTool(null);
+    setPendingSteps([]);
     scrollToBottom();
 
-    try {
-      const history = buildHistory(newMessages.slice(0, -1));
+    // Build conversation summary from last result
+    let conversationSummary: string | null = null;
+    if (lastResult) {
+      conversationSummary =
+        `Previous SQL:\n\`\`\`sql\n${lastResult.sql}\n\`\`\`\n\n` +
+        `Explanation: ${lastResult.explanation}`;
+    }
 
-      const result = await api.llm.generateSql({
+    const steps: AgentToolStep[] = [];
+    let thinkingText = '';
+
+    const controller = streamAgentChat(
+      workflowId,
+      {
         prompt,
-        available_tables: loadedSchemas,
-        workflow_parameters: parameters as WorkflowParameter[],
-        conversation_history: history.length > 0 ? history : [],
+        conversation_summary: conversationSummary,
         current_query: currentQuery,
-      });
+      },
+      {
+        onToolCall: (event) => {
+          setCurrentTool(event.tool);
+          steps.push({
+            tool: event.tool,
+            input: event.input,
+            iteration: event.iteration,
+          });
+          setPendingSteps([...steps]);
+          scrollToBottom();
+        },
+        onToolResult: (event) => {
+          const step = steps.find(
+            (s) => s.tool === event.tool && s.result === undefined,
+          );
+          if (step) {
+            step.result = event.result;
+            step.duration_ms = event.duration_ms;
+          }
+          setCurrentTool(null);
+          setPendingSteps([...steps]);
+          scrollToBottom();
+        },
+        onThinking: (event) => {
+          thinkingText = event.text;
+          scrollToBottom();
+        },
+        onResult: (event) => {
+          const assistantMsg: AgentMessage = {
+            role: 'assistant',
+            content: event.explanation,
+            sql: event.sql,
+            toolSteps: [...steps],
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setLastResult({ sql: event.sql, explanation: event.explanation });
+          setLoading(false);
+          setCurrentTool(null);
+          setPendingSteps([]);
+          onSqlGenerated(event.sql);
+          scrollToBottom();
+        },
+        onError: (event) => {
+          const errorMsg: AgentMessage = {
+            role: 'assistant',
+            content: event.message,
+            toolSteps: steps.length > 0 ? [...steps] : undefined,
+            isError: true,
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+          setLoading(false);
+          setCurrentTool(null);
+          setPendingSteps([]);
+          scrollToBottom();
+        },
+      },
+    );
 
-      let finalSql = result.sql;
-      let finalExplanation = result.explanation || 'Query updated.';
-
-      // Validate the generated SQL and auto-retry if it has errors
-      const validated = await validateAndRetry(
-        finalSql,
-        finalExplanation,
-        newMessages,
-        loadedSchemas,
-        parameters as WorkflowParameter[],
-        currentQuery,
-      );
-      finalSql = validated.sql;
-      finalExplanation = validated.explanation;
-
-      setMessages([
-        ...newMessages,
-        { role: 'assistant', content: finalExplanation, sql: finalSql },
-      ]);
-
-      onSqlGenerated(finalSql);
-    } catch (e) {
-      if (e instanceof ApiError) {
-        setError(e.detail);
-      } else {
-        setError('Failed to generate SQL. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-      scrollToBottom();
-    }
-  }
-
-  async function validateAndRetry(
-    sql: string,
-    explanation: string,
-    conversationMessages: ChatMessage[],
-    availableTables: TableSchema[],
-    workflowParams: WorkflowParameter[],
-    query: string | null,
-  ): Promise<{ sql: string; explanation: string }> {
-    for (let attempt = 0; attempt < MAX_VALIDATION_RETRIES; attempt++) {
-      setLoadingText('Validating query...');
-      scrollToBottom();
-
-      let validation;
-      try {
-        validation = await api.execution.validateQuery(workflowId, sql);
-      } catch {
-        // If validation endpoint itself fails, accept the query as-is
-        return { sql, explanation };
-      }
-
-      if (validation.valid) {
-        return { sql, explanation };
-      }
-
-      // Query is invalid — ask the LLM to fix it
-      setLoadingText(`Query error detected, asking AI to fix (attempt ${attempt + 1}/${MAX_VALIDATION_RETRIES})...`);
-      scrollToBottom();
-
-      const retryHistory = buildHistory([
-        ...conversationMessages,
-        { role: 'assistant', content: explanation, sql },
-      ]);
-
-      const tableNames = availableTables.map((t) => t.name).join(', ');
-      const fixPrompt =
-        `The query you generated has an error when validated against the data sources:\n\n` +
-        `Error: ${validation.error}\n\n` +
-        `Available tables: ${tableNames}\n\n` +
-        `Please fix the query and return the corrected full SQL.`;
-
-      const retryResult = await api.llm.generateSql({
-        prompt: fixPrompt,
-        available_tables: availableTables,
-        workflow_parameters: workflowParams,
-        conversation_history: retryHistory,
-        current_query: query,
-      });
-
-      sql = retryResult.sql;
-      explanation = retryResult.explanation || 'Query corrected.';
-    }
-
-    // After max retries, accept whatever we have
-    return { sql, explanation };
+    abortRef.current = controller;
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -203,7 +149,9 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
     <div className="flex h-full flex-col" data-testid="llm-chat">
       {/* Header */}
       <div className="border-b border-gray-200 px-3 py-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">AI Assistant</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          AI Assistant
+        </h3>
       </div>
 
       {!llmAvailable ? (
@@ -216,7 +164,7 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
         <>
           {/* Chat messages */}
           <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3">
-            {messages.length === 0 && (
+            {messages.length === 0 && !loading && (
               <p className="text-sm text-gray-400">
                 Describe the transformation you need and I'll generate DuckDB SQL for you.
               </p>
@@ -232,24 +180,33 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
                   </div>
                 ) : (
                   <div className="max-w-[85%]">
-                    <p className="text-sm text-gray-600">{msg.content}</p>
+                    {msg.toolSteps && msg.toolSteps.length > 0 && (
+                      <ToolTrace steps={msg.toolSteps} />
+                    )}
+                    <p
+                      className={`text-sm ${msg.isError ? 'text-red-600' : 'text-gray-600'}`}
+                    >
+                      {msg.content}
+                    </p>
                   </div>
                 )}
               </div>
             ))}
 
+            {/* Live loading state */}
             {loading && (
               <div className="mb-3">
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {loadingText}
+                <div className="max-w-[85%]">
+                  {pendingSteps.length > 0 && (
+                    <ToolTrace steps={pendingSteps} />
+                  )}
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {currentTool
+                      ? `Running ${currentTool}...`
+                      : 'Thinking...'}
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-600">
-                {error}
               </div>
             )}
           </div>
@@ -266,18 +223,102 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
                 onKeyDown={handleKeyDown}
                 disabled={loading}
               />
-              <Button
-                className="self-end"
-                size="sm"
-                onClick={sendMessage}
-                disabled={loading || !inputValue.trim()}
-              >
-                Send
-              </Button>
+              {loading ? (
+                <Button
+                  className="self-end"
+                  size="sm"
+                  variant="outline"
+                  onClick={stopGeneration}
+                >
+                  <Square className="h-3 w-3" />
+                </Button>
+              ) : (
+                <Button
+                  className="self-end"
+                  size="sm"
+                  onClick={sendMessage}
+                  disabled={!inputValue.trim()}
+                >
+                  Send
+                </Button>
+              )}
             </div>
           </div>
         </>
       )}
     </div>
   );
+}
+
+function ToolTrace({ steps }: { steps: AgentToolStep[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mb-2">
+      <button
+        className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronRight className="h-3 w-3" />
+        )}
+        {steps.length} tool {steps.length === 1 ? 'call' : 'calls'}
+      </button>
+      {expanded && (
+        <div className="mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
+          {steps.map((step, i) => (
+            <ToolStepItem key={i} step={step} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolStepItem({ step }: { step: AgentToolStep }) {
+  const [showResult, setShowResult] = useState(false);
+
+  const inputSummary = Object.entries(step.input)
+    .map(([k, v]) => `${k}: ${typeof v === 'string' && v.length > 40 ? v.slice(0, 40) + '...' : JSON.stringify(v)}`)
+    .join(', ');
+
+  return (
+    <div className="text-xs">
+      <div className="flex items-center gap-1 text-gray-500">
+        <span className="font-medium text-gray-700">{step.tool}</span>
+        {inputSummary && (
+          <span className="truncate text-gray-400">({inputSummary})</span>
+        )}
+        {step.duration_ms !== undefined && (
+          <span className="text-gray-300">{step.duration_ms}ms</span>
+        )}
+        {step.result === undefined && (
+          <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+        )}
+      </div>
+      {step.result !== undefined && (
+        <button
+          className="text-gray-400 hover:text-gray-600"
+          onClick={() => setShowResult(!showResult)}
+        >
+          {showResult ? 'hide result' : 'show result'}
+        </button>
+      )}
+      {showResult && step.result && (
+        <pre className="mt-1 max-h-32 overflow-auto rounded bg-gray-50 p-2 text-xs text-gray-600">
+          {formatToolResult(step.result)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function formatToolResult(result: string): string {
+  try {
+    return JSON.stringify(JSON.parse(result), null, 2);
+  } catch {
+    return result;
+  }
 }

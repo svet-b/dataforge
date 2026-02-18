@@ -301,11 +301,7 @@ async def source_schema(
     uploaded_files = db.query(UploadedFile).filter(UploadedFile.workflow_id == workflow_id).all()
     file_path_map = {uf.filename: uf.storage_path for uf in uploaded_files}
     config = dict(source_model.config)
-    if (
-        source_model.type == "file"
-        and "filename" in config
-        and "file_path" not in config
-    ):
+    if source_model.type == "file" and "filename" in config and "file_path" not in config:
         filename = config["filename"]
         if filename in file_path_map:
             config["file_path"] = file_path_map[filename]

@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import execution, llm, workflows
+from app.routers import agent, execution, llm, workflows
 
 logging.basicConfig(level=settings.log_level.upper())
 
@@ -18,6 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(agent.router)
 app.include_router(execution.router)
 app.include_router(llm.router)
 app.include_router(workflows.router)

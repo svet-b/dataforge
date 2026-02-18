@@ -4,7 +4,7 @@ import logging
 from typing import cast
 
 import anthropic
-from anthropic.types import Message, MessageParam
+from anthropic.types import Message, MessageParam, ToolParam
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,29 @@ class ClaudeProvider:
         block = response.content[0]
         assert block.type == "text"
         return block.text
+
+    async def generate_with_tools(
+        self,
+        system_prompt: str,
+        messages: list[MessageParam],
+        tools: list[ToolParam],
+    ) -> Message:
+        """Send a conversation with tools to Claude and return the full Message."""
+        logger.info(
+            "Anthropic tool request: model=%s, message_count=%d, tool_count=%d",
+            self.model,
+            len(messages),
+            len(tools),
+        )
+        response = await self.client.messages.create(
+            model=self.model,
+            max_tokens=4096,
+            system=system_prompt,
+            messages=messages,
+            tools=tools,
+        )
+        self._log_response(response)
+        return response
 
     async def generate_with_history(
         self,

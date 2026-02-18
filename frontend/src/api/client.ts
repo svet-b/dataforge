@@ -12,13 +12,17 @@ import type {
   UploadedFileResponse,
   RunHistorySummary,
   RunHistoryDetail,
-  GenerateSQLRequest,
-  GenerateSQLResponse,
   LlmStatus,
   CTEInspectionResponse,
   SourcePreviewResponse,
   SourceSchemaResponse,
   ValidateQueryResponse,
+  AgentChatRequest,
+  AgentToolCallEvent,
+  AgentToolResultEvent,
+  AgentThinkingEvent,
+  AgentResultEvent,
+  AgentErrorEvent,
 } from '@/types';
 
 export class ApiError extends Error {
@@ -146,8 +150,103 @@ export const api = {
       `/api/workflows/${workflowId}/runs/${runId}/download?format=${format}`,
   },
   llm: {
-    generateSql: (data: GenerateSQLRequest) =>
-      request<GenerateSQLResponse>('POST', '/api/llm/generate-sql', data),
     status: () => request<LlmStatus>('GET', '/api/llm/status'),
   },
 };
+
+export interface AgentStreamHandlers {
+  onToolCall?: (event: AgentToolCallEvent) => void;
+  onToolResult?: (event: AgentToolResultEvent) => void;
+  onThinking?: (event: AgentThinkingEvent) => void;
+  onResult?: (event: AgentResultEvent) => void;
+  onError?: (event: AgentErrorEvent) => void;
+}
+
+export function streamAgentChat(
+  workflowId: string,
+  data: AgentChatRequest,
+  handlers: AgentStreamHandlers,
+): AbortController {
+  const controller = new AbortController();
+
+  (async () => {
+    try {
+      const res = await fetch(`/api/workflows/${workflowId}/agent/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        let detail = res.statusText;
+        try {
+          const json = await res.json();
+          detail = json.detail ?? JSON.stringify(json);
+        } catch {
+          // use statusText
+        }
+        handlers.onError?.({ message: detail });
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        handlers.onError?.({ message: 'No response body' });
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        let currentEvent = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ') && currentEvent) {
+            const jsonStr = line.slice(6);
+            try {
+              const data = JSON.parse(jsonStr);
+              switch (currentEvent) {
+                case 'tool_call':
+                  handlers.onToolCall?.(data as AgentToolCallEvent);
+                  break;
+                case 'tool_result':
+                  handlers.onToolResult?.(data as AgentToolResultEvent);
+                  break;
+                case 'thinking':
+                  handlers.onThinking?.(data as AgentThinkingEvent);
+                  break;
+                case 'result':
+                  handlers.onResult?.(data as AgentResultEvent);
+                  break;
+                case 'error':
+                  handlers.onError?.(data as AgentErrorEvent);
+                  break;
+              }
+            } catch {
+              // skip malformed JSON
+            }
+            currentEvent = '';
+          } else if (line.trim() === '') {
+            currentEvent = '';
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        handlers.onError?.({ message: (err as Error).message ?? 'Connection failed' });
+      }
+    }
+  })();
+
+  return controller;
+}

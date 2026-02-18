@@ -111,6 +111,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "sqlalchemy" },
     { name = "sqlglot" },
+    { name = "sse-starlette" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -136,6 +137,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "sqlglot", specifier = ">=28.10.1" },
+    { name = "sse-starlette", specifier = ">=2.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
 ]
 
@@ -780,6 +782,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/1c/66/b2b300f325227044aa6f511ea7c9f3109a1dc74b13a0897931c1754b504e/sqlglot-28.10.1.tar.gz", hash = "sha256:66e0dae43b4bce23314b80e9aef41b8c88fea0e17ada62de095b45262084a8c5", size = 5739510, upload-time = "2026-02-09T23:36:23.671Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/55/ff/5a768b34202e1ee485737bfa167bd84592585aa40383f883a8e346d767cc/sqlglot-28.10.1-py3-none-any.whl", hash = "sha256:214aef51fd4ce16407022f81cfc80c173409dab6d0f6ae18c52b43f43b31d4dd", size = 597053, upload-time = "2026-02-09T23:36:21.385Z" },
+]
+
+[[package]]
+name = "sse-starlette"
+version = "3.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "starlette" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8b/8d/00d280c03ffd39aaee0e86ec81e2d3b9253036a0f93f51d10503adef0e65/sse_starlette-3.2.0.tar.gz", hash = "sha256:8127594edfb51abe44eac9c49e59b0b01f1039d0c7461c6fd91d4e03b70da422", size = 27253, upload-time = "2026-01-17T13:11:05.62Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/7f/832f015020844a8b8f7a9cbc103dd76ba8e3875004c41e08440ea3a2b41a/sse_starlette-3.2.0-py3-none-any.whl", hash = "sha256:5876954bd51920fc2cd51baee47a080eb88a37b5b784e615abb0b283f801cdbf", size = 12763, upload-time = "2026-01-17T13:11:03.775Z" },
 ]
 
 [[package]]

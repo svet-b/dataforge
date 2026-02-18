@@ -118,24 +118,62 @@ export interface TableSchema {
   columns: SchemaColumn[];
 }
 
-export interface GenerateSQLRequest {
-  prompt: string;
-  available_tables: TableSchema[];
-  workflow_parameters: WorkflowParameter[];
-  conversation_history: { role: string; content: string }[];
-  current_query?: string | null;
-}
-
-export interface GenerateSQLResponse {
-  sql: string;
-  explanation: string;
-}
-
 export interface LlmStatus {
   status: string;
   provider: string;
   model?: string;
   error?: string;
+}
+
+// Agent types
+
+export interface AgentChatRequest {
+  prompt: string;
+  conversation_summary?: string | null;
+  current_query?: string | null;
+}
+
+export interface AgentToolCallEvent {
+  tool: string;
+  input: Record<string, unknown>;
+  iteration: number;
+}
+
+export interface AgentToolResultEvent {
+  tool: string;
+  result: string;
+  duration_ms: number;
+  iteration: number;
+}
+
+export interface AgentThinkingEvent {
+  text: string;
+  iteration: number;
+}
+
+export interface AgentResultEvent {
+  sql: string;
+  explanation: string;
+}
+
+export interface AgentErrorEvent {
+  message: string;
+}
+
+export interface AgentToolStep {
+  tool: string;
+  input: Record<string, unknown>;
+  result?: string;
+  duration_ms?: number;
+  iteration: number;
+}
+
+export interface AgentMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  sql?: string;
+  toolSteps?: AgentToolStep[];
+  isError?: boolean;
 }
 
 // Source preview types

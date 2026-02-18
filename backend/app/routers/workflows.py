@@ -352,9 +352,7 @@ def list_runs(
 
 
 @router.get("/{workflow_id}/runs/{run_id}", response_model=RunHistoryResponse)
-def get_run(
-    workflow_id: str, run_id: str, db: Session = Depends(get_db)
-) -> RunHistoryResponse:
+def get_run(workflow_id: str, run_id: str, db: Session = Depends(get_db)) -> RunHistoryResponse:
     _get_workflow_or_404(workflow_id, db)
     run = db.get(RunHistory, run_id)
     if not run or run.workflow_id != workflow_id:
