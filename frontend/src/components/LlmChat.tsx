@@ -21,6 +21,7 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
   const [pendingSteps, setPendingSteps] = useState<AgentToolStep[]>([]);
   const [llmAvailable, setLlmAvailable] = useState(true);
   const [lastResult, setLastResult] = useState<{ sql: string; explanation: string } | null>(null);
+  const [lastExchange, setLastExchange] = useState<{ prompt: string; reply: string } | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -59,12 +60,15 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
     setPendingSteps([]);
     scrollToBottom();
 
-    // Build conversation summary from last result
+    // Build conversation summary from last result or last exchange
     let conversationSummary: string | null = null;
     if (lastResult) {
       conversationSummary =
         `Previous SQL:\n\`\`\`sql\n${lastResult.sql}\n\`\`\`\n\n` +
         `Explanation: ${lastResult.explanation}`;
+    } else if (lastExchange) {
+      conversationSummary =
+        `Previous exchange:\nUser: ${lastExchange.prompt}\nAssistant: ${lastExchange.reply}`;
     }
 
     const steps: AgentToolStep[] = [];
@@ -113,10 +117,25 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
           };
           setMessages((prev) => [...prev, assistantMsg]);
           setLastResult({ sql: event.sql, explanation: event.explanation });
+          setLastExchange(null);
           setLoading(false);
           setCurrentTool(null);
           setPendingSteps([]);
           onSqlGenerated(event.sql);
+          scrollToBottom();
+        },
+        onMessage: (event) => {
+          const assistantMsg: AgentMessage = {
+            role: 'assistant',
+            content: event.text,
+            toolSteps: steps.length > 0 ? [...steps] : undefined,
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setLastResult(null);
+          setLastExchange({ prompt, reply: event.text });
+          setLoading(false);
+          setCurrentTool(null);
+          setPendingSteps([]);
           scrollToBottom();
         },
         onError: (event) => {

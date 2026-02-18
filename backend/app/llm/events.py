@@ -37,5 +37,10 @@ def result_event(sql: str, explanation: str) -> AgentEvent:
     return AgentEvent(type="result", data={"sql": sql, "explanation": explanation})
 
 
+def message_event(text: str) -> AgentEvent:
+    """Conversational response — agent replied with text but no SQL was generated."""
+    return AgentEvent(type="message", data={"text": text})
+
+
 def error_event(message: str) -> AgentEvent:
     return AgentEvent(type="error", data={"message": message})

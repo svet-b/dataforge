@@ -260,8 +260,8 @@ async def test_agent_bad_request_yields_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_text_only_yields_error() -> None:
-    """Agent responds with text only (no submit_sql) → error event."""
+async def test_agent_text_only_yields_message() -> None:
+    """Agent responds with text only (no submit_sql) → message event, not error."""
     ctx = _make_ctx()
     provider = AsyncMock()
 
@@ -276,7 +276,9 @@ async def test_agent_text_only_yields_error() -> None:
     async for event in run_agent(provider, "system", "do something", ctx):
         events.append(event)
 
-    assert any(e.type == "error" for e in events)
+    assert len(events) == 1
+    assert events[0].type == "message"
+    assert events[0].data["text"] == "I can't help with that."
     ctx.session.close()
 
 

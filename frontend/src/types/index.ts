@@ -156,6 +156,10 @@ export interface AgentResultEvent {
   explanation: string;
 }
 
+export interface AgentMessageEvent {
+  text: string;
+}
+
 export interface AgentErrorEvent {
   message: string;
 }
