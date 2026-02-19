@@ -50,9 +50,7 @@ def test_build_agent_system_prompt_with_params() -> None:
 
 
 def test_build_agent_system_prompt_with_current_query() -> None:
-    prompt = build_agent_system_prompt(
-        tables=[], parameters=[], current_query="SELECT * FROM foo"
-    )
+    prompt = build_agent_system_prompt(tables=[], parameters=[], current_query="SELECT * FROM foo")
     assert "Current Query" in prompt
     assert "get_current_query" in prompt
 

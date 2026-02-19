@@ -133,11 +133,9 @@ def _truncate_result(result: str, max_chars: int = MAX_TOOL_RESULT_CHARS) -> str
     """
     if len(result) <= max_chars:
         return result
-    logger.warning(
-        "Tool result truncated: %d chars → %d chars", len(result), max_chars
-    )
+    logger.warning("Tool result truncated: %d chars → %d chars", len(result), max_chars)
     # Trim to slightly under the limit to leave room for the note
-    trimmed = result[:max_chars - 120]
+    trimmed = result[: max_chars - 120]
     # Best-effort: trim to last complete line so JSON is less mangled
     last_newline = trimmed.rfind("\n")
     if last_newline > max_chars // 2:

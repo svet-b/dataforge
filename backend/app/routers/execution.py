@@ -3,13 +3,11 @@ from __future__ import annotations
 import csv
 import io
 import json
-from cuid2 import cuid_wrapper
-
-generate_cuid = cuid_wrapper()
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
+from cuid2 import cuid_wrapper
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -30,6 +28,8 @@ from app.schemas.execution import (
     ValidateQueryRequest,
     ValidateQueryResponse,
 )
+
+generate_cuid = cuid_wrapper()
 
 router = APIRouter(prefix="/api/workflows", tags=["execution"])
 

@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import os
 import re
-from cuid2 import cuid_wrapper
-
-generate_cuid = cuid_wrapper()
 from datetime import UTC, datetime
 from pathlib import Path
 
+from cuid2 import cuid_wrapper
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
@@ -27,6 +25,8 @@ from app.schemas.workflow import (
     WorkflowSummaryResponse,
     WorkflowUpdate,
 )
+
+generate_cuid = cuid_wrapper()
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 

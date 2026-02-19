@@ -86,11 +86,13 @@ async def _event_stream(
     try:
         async for event in agent_events:
             if event.type == "tool_call":
-                collected_steps.append({
-                    "tool": event.data.get("tool"),
-                    "input": event.data.get("input"),
-                    "iteration": event.data.get("iteration"),
-                })
+                collected_steps.append(
+                    {
+                        "tool": event.data.get("tool"),
+                        "input": event.data.get("input"),
+                        "iteration": event.data.get("iteration"),
+                    }
+                )
             elif event.type == "tool_result":
                 for step in reversed(collected_steps):
                     if step["tool"] == event.data.get("tool") and "result" not in step:
