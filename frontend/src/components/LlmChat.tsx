@@ -142,6 +142,18 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
           onSqlGenerated(event.sql);
           scrollToBottom();
         },
+        onMessage: (event) => {
+          const assistantMsg: AgentMessage = {
+            role: 'assistant',
+            content: event.text,
+            toolSteps: steps.length > 0 ? [...steps] : undefined,
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setLoading(false);
+          setCurrentTool(null);
+          setPendingSteps([]);
+          scrollToBottom();
+        },
         onError: (event) => {
           const errorMsg: AgentMessage = {
             role: 'assistant',

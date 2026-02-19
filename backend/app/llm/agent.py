@@ -18,6 +18,7 @@ from app.llm.claude_provider import ClaudeProvider
 from app.llm.events import (
     AgentEvent,
     error_event,
+    message_event,
     result_event,
     thinking_event,
     tool_call_event,
@@ -243,19 +244,20 @@ async def run_agent(
             elif block.type == "tool_use":
                 tool_uses.append(block)
 
-        # Emit thinking for any text content
-        if text_parts:
-            yield thinking_event("\n\n".join(text_parts), iteration)
-
-        # No tool calls — end_turn with text only
+        # No tool calls — end_turn means the agent sent a plain text reply
+        # (e.g. a clarifying question). Surface it as a proper message, not an error.
         if not tool_uses:
             if response.stop_reason == "end_turn":
-                yield error_event(
-                    "Agent responded with text but did not call submit_sql. "
-                    "Please try again with a clearer request."
-                )
+                if text_parts:
+                    yield message_event("\n\n".join(text_parts))
+                else:
+                    yield error_event("Agent stopped without providing a response.")
                 return
             break
+
+        # Emit thinking for any text content that accompanies tool calls (interim)
+        if text_parts:
+            yield thinking_event("\n\n".join(text_parts), iteration)
 
         # Process tool calls
         # First, append the assistant message with all content blocks
