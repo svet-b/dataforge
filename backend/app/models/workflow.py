@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.chat import ChatMessage
     from app.models.run import RunHistory
     from app.models.source import Source
     from app.models.uploaded_file import UploadedFile
@@ -38,4 +39,7 @@ class Workflow(Base):
     )
     runs: Mapped[list[RunHistory]] = relationship(
         "RunHistory", back_populates="workflow", cascade="all, delete-orphan"
+    )
+    chat_messages: Mapped[list[ChatMessage]] = relationship(
+        "ChatMessage", back_populates="workflow", cascade="all, delete-orphan"
     )
