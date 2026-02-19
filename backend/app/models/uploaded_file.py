@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import uuid
+from cuid2 import cuid as generate_cuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class UploadedFile(Base):
     __tablename__ = "uploaded_files"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_cuid)
     workflow_id: Mapped[str] = mapped_column(
         String, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
     )

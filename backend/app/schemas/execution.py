@@ -1,5 +1,4 @@
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -9,7 +8,7 @@ class RunRequest(BaseModel):
 
 
 class RunResponse(BaseModel):
-    run_id: UUID
+    run_id: str
     status: str
     duration_ms: int
     row_count: int | None

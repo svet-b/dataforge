@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import uuid
+from cuid2 import cuid as generate_cuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class Workflow(Base):
     __tablename__ = "workflows"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_cuid)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     query: Mapped[str | None] = mapped_column(Text, nullable=True)

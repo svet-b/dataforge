@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-import uuid
+from cuid2 import cuid as generate_cuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
@@ -116,7 +116,7 @@ async def run_workflow(
         schema_info = exec_result.schema_info
 
     # Store run in run_history (keep up to 10k rows for downloads)
-    run_id = str(uuid.uuid4())
+    run_id = generate_cuid()
     now = datetime.now(UTC).isoformat()
     run = RunHistory(
         id=run_id,

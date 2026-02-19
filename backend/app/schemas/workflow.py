@@ -1,5 +1,4 @@
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -27,7 +26,7 @@ class WorkflowUpdate(BaseModel):
 
 
 class WorkflowResponse(BaseModel):
-    id: UUID
+    id: str
     name: str
     description: str | None
     query: str | None
@@ -37,7 +36,7 @@ class WorkflowResponse(BaseModel):
 
 
 class WorkflowSummaryResponse(BaseModel):
-    id: UUID
+    id: str
     name: str
     description: str | None
     source_count: int
