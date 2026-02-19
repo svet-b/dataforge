@@ -14,7 +14,7 @@ export default function SourcePreview({ workflowId }: SourcePreviewProps) {
     if (!state.cached && !state.loading) {
       state.loadSourcePreview(workflowId);
     }
-  }, [workflowId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [workflowId, state.cached]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedData = useMemo(
     () => state.sources.find((s) => s.name === state.selectedSource) ?? null,

@@ -18,10 +18,19 @@ class APIConnector:
         parameters: dict[str, Any],
         env: dict[str, str],
     ) -> Path:
-        url = self._interpolate(config["url_template"], parameters, env)
+        url_template: str = config.get("url_template") or config.get("url") or ""
+        url = self._interpolate(url_template, parameters, env)
         method: str = config.get("method", "GET").upper()
+        raw_headers = config.get("headers", {})
+        # Accept headers as either a dict or a list of {key, value} objects
+        if isinstance(raw_headers, list):
+            headers_dict: dict[str, str] = {
+                h["key"]: h["value"] for h in raw_headers if h.get("key")
+            }
+        else:
+            headers_dict = raw_headers
         headers = {
-            k: self._interpolate(v, parameters, env) for k, v in config.get("headers", {}).items()
+            k: self._interpolate(v, parameters, env) for k, v in headers_dict.items()
         }
         body_template = config.get("body_template")
         body: dict[str, Any] | None = None
@@ -82,6 +91,44 @@ class APIConnector:
         if isinstance(current, list):
             return current
         return [current]
+
+    async def fetch_raw(
+        self,
+        config: dict[str, Any],
+        parameters: dict[str, Any],
+        env: dict[str, str],
+    ) -> tuple[Any, list[Any]]:
+        """Fetch raw JSON from the API and return (raw_data, extracted_records)."""
+        url_template: str = config.get("url_template") or config.get("url") or ""
+        url = self._interpolate(url_template, parameters, env)
+        method: str = config.get("method", "GET").upper()
+        raw_headers = config.get("headers", {})
+        if isinstance(raw_headers, list):
+            headers_dict: dict[str, str] = {
+                h["key"]: h["value"] for h in raw_headers if h.get("key")
+            }
+        else:
+            headers_dict = raw_headers
+        headers = {
+            k: self._interpolate(v, parameters, env) for k, v in headers_dict.items()
+        }
+        async with httpx.AsyncClient() as client:
+            if method == "POST":
+                response = await client.post(url, headers=headers)
+            else:
+                response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            raw_data = response.json()
+
+        response_path = config.get("response_path")
+        if response_path:
+            extracted: list[Any] = self._extract_by_path(raw_data, response_path)
+        elif isinstance(raw_data, list):
+            extracted = raw_data
+        else:
+            extracted = [raw_data]
+
+        return raw_data, extracted
 
     async def _fetch_paginated(
         self,

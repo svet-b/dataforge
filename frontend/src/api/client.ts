@@ -16,6 +16,7 @@ import type {
   LlmStatus,
   CTEInspectionResponse,
   SourcePreviewResponse,
+  SourceRawResponse,
   SourceSchemaResponse,
   ValidateQueryResponse,
   AgentChatRequest,
@@ -101,6 +102,11 @@ export const api = {
       request<SourceSchemaResponse>(
         'POST',
         `/api/workflows/${workflowId}/sources/${sourceId}/schema`,
+      ),
+    fetchRaw: (workflowId: string, sourceId: string) =>
+      request<SourceRawResponse>(
+        'POST',
+        `/api/workflows/${workflowId}/sources/${sourceId}/raw-response`,
       ),
   },
   execution: {

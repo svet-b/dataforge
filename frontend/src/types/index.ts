@@ -239,3 +239,9 @@ export interface CTEInspectionResponse {
   ctes: CTEResult[];
   error: ExecutionError | null;
 }
+
+export interface SourceRawResponse {
+  raw_data: unknown;
+  extracted_records: Record<string, unknown>[];
+  extracted_count: number;
+}

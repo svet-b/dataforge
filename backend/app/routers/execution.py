@@ -24,6 +24,7 @@ from app.schemas.execution import (
     RunRequest,
     RunResponse,
     SourcePreviewResponse,
+    SourceRawResponse,
     SourceSchemaResponse,
     ValidateQueryRequest,
     ValidateQueryResponse,
@@ -329,6 +330,41 @@ async def source_schema(
         session.close()
 
     return SourceSchemaResponse(columns=columns, row_count=row_count)
+
+
+@router.post("/{workflow_id}/sources/{source_id}/raw-response")
+async def source_raw_response(
+    workflow_id: str,
+    source_id: str,
+    db: Session = Depends(get_db),
+) -> SourceRawResponse:
+    """Fetch raw JSON response from an API source for preview and path selection."""
+    workflow = db.get(Workflow, workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    source_model = db.get(Source, source_id)
+    if not source_model or source_model.workflow_id != workflow_id:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    if source_model.type != "api":
+        raise HTTPException(status_code=400, detail="Source is not an API source")
+
+    config = dict(source_model.config)
+
+    from app.connectors.api_connector import APIConnector
+
+    connector = APIConnector()
+    try:
+        raw_data, extracted = await connector.fetch_raw(config, {}, {})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return SourceRawResponse(
+        raw_data=_json_safe(raw_data),
+        extracted_records=_json_safe(extracted[:50]),
+        extracted_count=len(extracted),
+    )
 
 
 @router.get("/{workflow_id}/runs/{run_id}/download")

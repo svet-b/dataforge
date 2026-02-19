@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SourceResponse, SchemaColumn } from '@/types';
+import type { SourceResponse, SchemaColumn, SourceRawResponse } from '@/types';
 import { useWorkflowStore } from '@/stores/workflow';
 import { api } from '@/api/client';
 import { addToast } from '@/stores/toasts';
@@ -7,7 +7,11 @@ import { debounce } from '@/utils/debounce';
 import { deriveTableName, tableNameFromUrl } from '@/utils/tableName';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { ChevronDown, ChevronRight, Loader2, Play } from 'lucide-react';
 import KeyValueEditor from './KeyValueEditor';
+import JsonTree from './JsonTree';
+
+
 
 interface SourceConfigPanelProps {
   workflowId: string;
@@ -36,6 +40,12 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
   );
   const [body, setBody] = useState((source.config.body as string) ?? '');
   const [responsePath, setResponsePath] = useState((source.config.response_path as string) ?? '');
+
+  // ── Raw preview state ──
+  const [rawData, setRawData] = useState<SourceRawResponse | null>(null);
+  const [rawLoading, setRawLoading] = useState(false);
+  const [rawError, setRawError] = useState<string | null>(null);
+  const [rawExpanded, setRawExpanded] = useState(false);
 
   // ── Common ──
   const [tableName, setTableName] = useState(source.table_name);
@@ -91,7 +101,30 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
     }
   }, [workflowId, source.id]);
 
-  // Auto-fetch schema when source is configured
+  const fetchRawPreview = useCallback(async () => {
+    setRawLoading(true);
+    setRawError(null);
+    setRawData(null);
+    setRawExpanded(true);
+    try {
+      const result = await api.sources.fetchRaw(workflowId, source.id);
+      setRawData(result);
+    } catch (e) {
+      setRawError(e instanceof Error ? e.message : 'Failed to fetch response');
+    } finally {
+      setRawLoading(false);
+    }
+  }, [workflowId, source.id]);
+
+  // Clear raw preview when switching sources or when the saved URL changes
+  useEffect(() => {
+    setRawData(null);
+    setRawError(null);
+    setRawLoading(false);
+    setRawExpanded(false);
+  }, [source.id, source.config.url]);
+
+  // Auto-fetch schema when source is configured or response_path changes
   useEffect(() => {
     if (sourceConfigured) {
       fetchSchema();
@@ -100,7 +133,7 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
       setSchemaRowCount(null);
       setSchemaError(null);
     }
-  }, [source.id, sourceConfigured, fetchSchema]);
+  }, [source.id, sourceConfigured, source.config.response_path, fetchSchema]);
 
   // Use a ref to hold the latest local state for the debounced save
   const stateRef = useRef({ tableName, filename, fileType, delimiter, hasHeader, url, method, headers, body, responsePath });
@@ -132,6 +165,15 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
         });
       }, 500),
     [workflowId, source.id, source.type, updateSource],
+  );
+
+  const handleSelectPath = useCallback(
+    (path: string) => {
+      setResponsePath(path);
+      saveConfig();
+      // Schema auto-reloads via useEffect when source.config.response_path changes after save
+    },
+    [saveConfig],
   );
 
   function onFieldChange() {
@@ -256,7 +298,28 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
           <>
             {/* API source */}
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">URL</label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="block text-xs font-medium text-gray-600">URL</label>
+                {url && (
+                  <button
+                    className="flex items-center gap-1 text-xs text-blue-600 underline hover:text-blue-800 disabled:opacity-50"
+                    onClick={fetchRawPreview}
+                    disabled={rawLoading}
+                  >
+                    {rawLoading ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Running...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-3 w-3" />
+                        Run Request
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
               <Input
                 className="text-sm"
                 value={url}
@@ -310,6 +373,43 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
               />
             </div>
           </>
+        )}
+
+        {/* Raw response preview (API sources) */}
+        {source.type === 'api' && (rawData || rawError) && (
+          <div className="pt-1">
+            <button
+              className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-800"
+              onClick={() => setRawExpanded(!rawExpanded)}
+            >
+              {rawExpanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+              Raw Response
+              {rawData && (
+                <span className="ml-1 font-normal text-gray-400">(click arrays to set path)</span>
+              )}
+            </button>
+            {rawExpanded && (
+              <div className="mt-1 space-y-2">
+                {rawError ? (
+                  <p className="text-xs text-red-600">{rawError}</p>
+                ) : rawData ? (
+                  <>
+                    <div className="max-h-64 overflow-y-auto rounded border border-gray-200 bg-white p-2">
+                      <JsonTree
+                        data={rawData.raw_data}
+                        selectedPath={responsePath || undefined}
+                        onSelectPath={handleSelectPath}
+                      />
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Schema display */}

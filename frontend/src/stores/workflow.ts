@@ -7,6 +7,7 @@ import type {
   SourceType,
 } from '@/types';
 import { addToast } from './toasts';
+import { useSourcePreviewStore } from './sourcePreview';
 
 interface WorkflowState {
   workflow: WorkflowDetail | null;
@@ -83,6 +84,7 @@ export const useWorkflowStore = create<WorkflowState & WorkflowActions>((set, ge
           },
         };
       });
+      useSourcePreviewStore.getState().reset();
     } catch (e) {
       addToast(errorMsg(e), 'error');
     }

@@ -58,3 +58,9 @@ class ValidateQueryRequest(BaseModel):
 class ValidateQueryResponse(BaseModel):
     valid: bool
     error: str | None = None
+
+
+class SourceRawResponse(BaseModel):
+    raw_data: Any
+    extracted_records: list[dict[str, Any]]
+    extracted_count: int
