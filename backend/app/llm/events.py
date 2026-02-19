@@ -33,6 +33,11 @@ def thinking_event(text: str, iteration: int) -> AgentEvent:
     return AgentEvent(type="thinking", data={"text": text, "iteration": iteration})
 
 
+def message_event(text: str) -> AgentEvent:
+    """Plain conversational reply from the agent (no SQL produced)."""
+    return AgentEvent(type="message", data={"text": text})
+
+
 def result_event(sql: str, explanation: str) -> AgentEvent:
     return AgentEvent(type="result", data={"sql": sql, "explanation": explanation})
 

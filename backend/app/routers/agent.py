@@ -102,6 +102,8 @@ async def _event_stream(
             elif event.type == "result":
                 assistant_content = event.data.get("explanation", "")
                 result_sql = event.data.get("sql")
+            elif event.type == "message":
+                assistant_content = event.data.get("text", "")
             elif event.type == "error":
                 assistant_content = event.data.get("message", "")
                 is_error = True

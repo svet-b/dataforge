@@ -164,6 +164,10 @@ export interface AgentErrorEvent {
   message: string;
 }
 
+export interface AgentMessageEvent {
+  text: string;
+}
+
 export interface AgentToolStep {
   tool: string;
   input: Record<string, unknown>;
