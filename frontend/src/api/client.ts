@@ -25,6 +25,7 @@ import type {
   AgentResultEvent,
   AgentMessageEvent,
   AgentErrorEvent,
+  AgentMessageEvent,
 } from '@/types';
 
 export class ApiError extends Error {
