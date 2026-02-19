@@ -16,6 +16,7 @@ dependencies = [
     "anthropic>=0.40",
     "sqlglot>=28.10.1",
     "sse-starlette>=2.0",
+    "cuid2>=2.0",
 ]
 
 [dependency-groups]

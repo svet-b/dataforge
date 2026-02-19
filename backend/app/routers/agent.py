@@ -11,14 +11,16 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
 from app.config import settings
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.engine.duckdb_manager import DuckDBSession
 from app.engine.executor import WorkflowExecutor
 from app.llm import create_llm_provider
 from app.llm.agent import AgentContext, run_agent
 from app.llm.events import AgentEvent
 from app.llm.prompts import build_agent_system_prompt
+from app.models.chat import ChatMessage
 from app.routers.execution import _load_workflow, _merge_parameters
+from app.schemas.chat import ChatMessageResponse
 
 logger = logging.getLogger(__name__)
 
@@ -72,17 +74,97 @@ async def _create_agent_context(
 
 async def _event_stream(
     agent_events: AsyncIterator[AgentEvent],
-    session: DuckDBSession,
+    duckdb_session: DuckDBSession,
+    workflow_id: str,
 ) -> AsyncIterator[dict[str, str]]:
-    """Wrap agent events as SSE dicts and ensure cleanup."""
+    """Wrap agent events as SSE dicts, persist the assistant message, and ensure cleanup."""
+    collected_steps: list[dict[str, Any]] = []
+    result_sql: str | None = None
+    assistant_content = ""
+    is_error = False
+
     try:
         async for event in agent_events:
+            if event.type == "tool_call":
+                collected_steps.append({
+                    "tool": event.data.get("tool"),
+                    "input": event.data.get("input"),
+                    "iteration": event.data.get("iteration"),
+                })
+            elif event.type == "tool_result":
+                for step in reversed(collected_steps):
+                    if step["tool"] == event.data.get("tool") and "result" not in step:
+                        step["result"] = event.data.get("result")
+                        step["duration_ms"] = event.data.get("duration_ms")
+                        break
+            elif event.type == "result":
+                assistant_content = event.data.get("explanation", "")
+                result_sql = event.data.get("sql")
+            elif event.type == "error":
+                assistant_content = event.data.get("message", "")
+                is_error = True
+
             yield {
                 "event": event.type,
                 "data": json.dumps(event.data),
             }
     finally:
-        session.close()
+        duckdb_session.close()
+
+        if assistant_content:
+            save_db = SessionLocal()
+            try:
+                msg = ChatMessage(
+                    workflow_id=workflow_id,
+                    role="assistant",
+                    content=assistant_content,
+                    sql=result_sql,
+                    tool_steps=collected_steps if collected_steps else None,
+                    is_error=is_error,
+                )
+                save_db.add(msg)
+                save_db.commit()
+            except Exception:
+                logger.exception("Failed to persist assistant chat message")
+            finally:
+                save_db.close()
+
+
+@router.get("/{workflow_id}/chat")
+def get_chat_history(
+    workflow_id: str,
+    db: Session = Depends(get_db),
+) -> list[ChatMessageResponse]:
+    """Return persisted chat messages for a workflow, oldest first."""
+    messages = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.workflow_id == workflow_id)
+        .order_by(ChatMessage.created_at)
+        .all()
+    )
+    return [
+        ChatMessageResponse(
+            id=m.id,
+            workflow_id=m.workflow_id,
+            role=m.role,
+            content=m.content,
+            sql=m.sql,
+            tool_steps=m.tool_steps,
+            is_error=m.is_error,
+            created_at=m.created_at,
+        )
+        for m in messages
+    ]
+
+
+@router.delete("/{workflow_id}/chat", status_code=204)
+def clear_chat_history(
+    workflow_id: str,
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete all chat messages for a workflow."""
+    db.query(ChatMessage).filter(ChatMessage.workflow_id == workflow_id).delete()
+    db.commit()
 
 
 @router.post("/{workflow_id}/agent/chat")
@@ -104,6 +186,15 @@ async def agent_chat(
     # Use current_query from request body, fall back to workflow query
     current_query = body.current_query if body.current_query is not None else query
 
+    # Persist the user message before streaming begins
+    user_msg = ChatMessage(
+        workflow_id=workflow_id,
+        role="user",
+        content=body.prompt,
+    )
+    db.add(user_msg)
+    db.commit()
+
     ctx, table_schemas = await _create_agent_context(sources, parameters, current_query)
 
     param_info: list[dict[str, object]] = []
@@ -121,6 +212,6 @@ async def agent_chat(
     agent_events = run_agent(_provider, system_prompt, body.prompt, ctx)
 
     return EventSourceResponse(
-        _event_stream(agent_events, ctx.session),
+        _event_stream(agent_events, ctx.session, workflow_id),
         media_type="text/event-stream",
     )

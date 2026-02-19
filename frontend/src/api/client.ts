@@ -1,4 +1,5 @@
 import type {
+  ChatMessage,
   WorkflowSummary,
   WorkflowResponse,
   WorkflowDetail,
@@ -152,6 +153,12 @@ export const api = {
   },
   llm: {
     status: () => request<LlmStatus>('GET', '/api/llm/status'),
+  },
+  chat: {
+    list: (workflowId: string) =>
+      request<ChatMessage[]>('GET', `/api/workflows/${workflowId}/chat`),
+    clear: (workflowId: string) =>
+      request<void>('DELETE', `/api/workflows/${workflowId}/chat`),
   },
 };
 

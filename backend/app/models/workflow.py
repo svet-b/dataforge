@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import uuid
+from cuid2 import cuid as generate_cuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.chat import ChatMessage
     from app.models.run import RunHistory
     from app.models.source import Source
     from app.models.uploaded_file import UploadedFile
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
 class Workflow(Base):
     __tablename__ = "workflows"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_cuid)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     query: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -38,4 +39,7 @@ class Workflow(Base):
     )
     runs: Mapped[list[RunHistory]] = relationship(
         "RunHistory", back_populates="workflow", cascade="all, delete-orphan"
+    )
+    chat_messages: Mapped[list[ChatMessage]] = relationship(
+        "ChatMessage", back_populates="workflow", cascade="all, delete-orphan"
     )

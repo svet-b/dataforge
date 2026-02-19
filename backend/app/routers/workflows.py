@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import re
-import uuid
+from cuid2 import cuid as generate_cuid
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -261,7 +261,7 @@ async def upload_file(
     ext = Path(filename).suffix.lower()
     file_type = FILE_TYPE_MAP.get(ext, "csv")
 
-    file_id = str(uuid.uuid4())
+    file_id = generate_cuid()
     dir_path = Path(settings.data_dir) / "files" / workflow_id
     dir_path.mkdir(parents=True, exist_ok=True)
     storage_path = dir_path / f"{file_id}_{filename}"

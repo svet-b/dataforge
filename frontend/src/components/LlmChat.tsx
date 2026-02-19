@@ -5,7 +5,7 @@ import { useWorkflowStore } from '@/stores/workflow';
 import type { AgentMessage, AgentToolStep } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronRight, Loader2, Square } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Square, Trash2 } from 'lucide-react';
 
 interface LlmChatProps {
   workflowId: string;
@@ -31,7 +31,30 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
     api.llm.status().then((status) => {
       setLlmAvailable(status.status === 'ok');
     }).catch(() => setLlmAvailable(false));
-  }, []);
+
+    api.chat.list(workflowId).then((history) => {
+      const loaded: AgentMessage[] = history.map((m) => ({
+        role: m.role,
+        content: m.content,
+        sql: m.sql ?? undefined,
+        toolSteps: m.tool_steps ?? undefined,
+        isError: m.is_error,
+      }));
+      setMessages(loaded);
+
+      // Restore conversation context from the most recent assistant message with SQL
+      const lastSqlMsg = [...history].reverse().find((m) => m.role === 'assistant' && m.sql);
+      if (lastSqlMsg) {
+        setLastResult({ sql: lastSqlMsg.sql!, explanation: lastSqlMsg.content });
+      }
+    }).catch(() => {/* silently ignore */});
+  }, [workflowId]);
+
+  async function clearChat() {
+    await api.chat.clear(workflowId).catch(() => {/* silently ignore */});
+    setMessages([]);
+    setLastResult(null);
+  }
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -167,10 +190,21 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
   return (
     <div className="flex h-full flex-col" data-testid="llm-chat">
       {/* Header */}
-      <div className="border-b border-gray-200 px-3 py-2">
+      <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
           AI Assistant
         </h3>
+        {messages.length > 0 && !loading && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-gray-400 hover:text-gray-600"
+            onClick={clearChat}
+            title="Clear chat history"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
       </div>
 
       {!llmAvailable ? (

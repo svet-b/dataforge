@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import uuid
+from cuid2 import cuid as generate_cuid
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, ForeignKey, String, Text
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class Source(Base):
     __tablename__ = "sources"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_cuid)
     workflow_id: Mapped[str] = mapped_column(
         String, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
     )

@@ -180,6 +180,17 @@ export interface AgentMessage {
   isError?: boolean;
 }
 
+export interface ChatMessage {
+  id: string;
+  workflow_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  sql: string | null;
+  tool_steps: AgentToolStep[] | null;
+  is_error: boolean;
+  created_at: string;
+}
+
 // Source preview types
 
 export interface SourcePreviewResult {

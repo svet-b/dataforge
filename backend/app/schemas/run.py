@@ -1,13 +1,12 @@
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel
 
 
 class RunHistorySummaryResponse(BaseModel):
-    id: UUID
-    workflow_id: UUID
+    id: str
+    workflow_id: str
     parameters: dict[str, Any]
     status: str
     started_at: datetime
@@ -18,8 +17,8 @@ class RunHistorySummaryResponse(BaseModel):
 
 
 class RunHistoryResponse(BaseModel):
-    id: UUID
-    workflow_id: UUID
+    id: str
+    workflow_id: str
     parameters: dict[str, Any]
     status: str
     started_at: datetime

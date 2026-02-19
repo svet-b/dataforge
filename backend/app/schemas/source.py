@@ -1,5 +1,4 @@
 from typing import Any, Literal
-from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -16,8 +15,8 @@ class SourceUpdate(BaseModel):
 
 
 class SourceResponse(BaseModel):
-    id: UUID
-    workflow_id: UUID
+    id: str
+    workflow_id: str
     table_name: str
     type: str
     config: dict[str, Any]
