@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from cuid2 import cuid as generate_cuid
+from cuid2 import cuid_wrapper
+
+generate_cuid = cuid_wrapper()
 from sqlalchemy import JSON, Boolean, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

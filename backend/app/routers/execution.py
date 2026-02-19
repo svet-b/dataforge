@@ -3,7 +3,9 @@ from __future__ import annotations
 import csv
 import io
 import json
-from cuid2 import cuid as generate_cuid
+from cuid2 import cuid_wrapper
+
+generate_cuid = cuid_wrapper()
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any

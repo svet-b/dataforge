@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import os
 import re
-from cuid2 import cuid as generate_cuid
+from cuid2 import cuid_wrapper
+
+generate_cuid = cuid_wrapper()
 from datetime import UTC, datetime
 from pathlib import Path
 

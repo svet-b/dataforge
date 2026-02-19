@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from cuid2 import cuid as generate_cuid
+from cuid2 import cuid_wrapper
+
+generate_cuid = cuid_wrapper()
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, ForeignKey, String, Text
