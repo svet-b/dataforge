@@ -14,7 +14,11 @@ class RunHistorySummaryResponse(BaseModel):
     row_count: int | None
     schema_info: list[dict[str, str]] | None
     error: dict[str, Any] | None
-    source_hashes: dict[str, str] | None = None
+    query_hash: str | None = None
+    source_config_hash: str | None = None
+    parameters_hash: str | None = None
+    source_data_hash: str | None = None
+    result_hash: str | None = None
 
 
 class RunHistoryResponse(BaseModel):
@@ -29,4 +33,8 @@ class RunHistoryResponse(BaseModel):
     schema_info: list[dict[str, str]] | None
     output_preview: dict[str, Any] | None
     error: dict[str, Any] | None
-    source_hashes: dict[str, str] | None = None
+    query_hash: str | None = None
+    source_config_hash: str | None = None
+    parameters_hash: str | None = None
+    source_data_hash: str | None = None
+    result_hash: str | None = None

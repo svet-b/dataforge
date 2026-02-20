@@ -43,6 +43,13 @@ async def test_simple_workflow_execution(executor: WorkflowExecutor) -> None:
     assert abs(by_meter["M-001"] - 36.9) < 0.01
     assert abs(by_meter["M-002"] - 42.4) < 0.01
 
+    # Verify provenance fields
+    assert "raw_data" in result.source_file_hashes
+    assert len(result.source_file_hashes["raw_data"]) == 64  # SHA-256 hex
+    assert "raw_data" in result.source_file_paths
+    assert result.source_file_paths["raw_data"].exists()
+    assert len(result.ndjson_result) > 0
+
 
 @pytest.mark.asyncio
 async def test_workflow_with_parameters(executor: WorkflowExecutor) -> None:

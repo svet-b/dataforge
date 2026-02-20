@@ -32,6 +32,18 @@ class RunHistory(Base):
     output_preview: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     error: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     node_timings: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    source_hashes: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
+    query_hash: Mapped[str | None] = mapped_column(
+        String, ForeignKey("content_store.sha256"), nullable=True
+    )
+    source_config_hash: Mapped[str | None] = mapped_column(
+        String, ForeignKey("content_store.sha256"), nullable=True
+    )
+    parameters_hash: Mapped[str | None] = mapped_column(
+        String, ForeignKey("content_store.sha256"), nullable=True
+    )
+    source_data_hash: Mapped[str | None] = mapped_column(
+        String, ForeignKey("content_store.sha256"), nullable=True
+    )
+    result_hash: Mapped[str | None] = mapped_column(String, nullable=True)
 
     workflow: Mapped[Workflow] = relationship("Workflow", back_populates="runs")

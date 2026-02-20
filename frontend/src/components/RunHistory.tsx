@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRunsStore } from '@/stores/runs';
 import { api } from '@/api/client';
 import { ChevronDown, Loader2 } from 'lucide-react';
+import type { RunHistorySummary } from '@/types';
 
 interface RunHistoryProps {
   workflowId: string;
@@ -54,11 +55,18 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
     );
   }
 
+  const hashFields: { key: keyof RunHistorySummary; label: string }[] = [
+    { key: 'query_hash', label: 'Query' },
+    { key: 'source_config_hash', label: 'Sources' },
+    { key: 'parameters_hash', label: 'Params' },
+    { key: 'source_data_hash', label: 'Data' },
+    { key: 'result_hash', label: 'Result' },
+  ];
+
   return (
     <div className="divide-y divide-gray-100 overflow-y-auto">
       {runs.map((run, runIndex) => {
-        const prevHashes = runs[runIndex + 1]?.source_hashes ?? null;
-        const hashes = expandedRunId === run.id ? expandedRun?.source_hashes : null;
+        const prevRun = runs[runIndex + 1] ?? null;
         return (
           <div key={run.id}>
           <button
@@ -104,26 +112,25 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
                 </div>
               )}
 
-              {hashes && Object.keys(hashes).length > 0 && (
+              {expandedRun.query_hash && (
                 <div className="mb-2">
-                  <span className="font-semibold text-gray-600">Sources:</span>
+                  <span className="font-semibold text-gray-600">Provenance:</span>
                   <div className="mt-0.5 space-y-0.5">
-                    {Object.entries(hashes).map(([table, hash]) => {
-                      const prev = prevHashes?.[table];
+                    {hashFields.map(({ key, label }) => {
+                      const hash = expandedRun[key] as string | null | undefined;
+                      if (!hash) return null;
+                      const prev = prevRun?.[key] as string | null | undefined;
                       const status = !prev ? 'new' : prev === hash ? 'same' : 'changed';
                       return (
-                        <div key={table} className="flex items-center gap-2">
+                        <div key={key} className="flex items-center gap-2">
                           <span className={
                             status === 'same' ? 'text-green-500' :
                             status === 'changed' ? 'text-amber-500' : 'text-gray-400'
                           }>
-                            {status === 'same' ? '✓' : status === 'changed' ? '!' : '·'}
+                            {status === 'same' ? '=' : status === 'changed' ? '~' : '+'}
                           </span>
-                          <span className="font-medium text-gray-700">{table}</span>
-                          <span className="font-mono text-gray-400" title={hash}>{hash.slice(0, 8)}</span>
-                          {status === 'same' && (
-                            <span className="text-green-600">unchanged</span>
-                          )}
+                          <span className="w-14 font-medium text-gray-700">{label}</span>
+                          <span className="font-mono text-gray-400" title={hash}>{hash.slice(0, 12)}</span>
                           {status === 'changed' && (
                             <span className="text-amber-600">changed</span>
                           )}

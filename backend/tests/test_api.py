@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -330,10 +331,23 @@ def test_full_workflow(client: TestClient) -> None:
     assert abs(by_meter["M-001"] - 36.9) < 0.01
     assert abs(by_meter["M-002"] - 42.4) < 0.01
 
+    # 6b. Verify provenance hashes
+    assert result["query_hash"] is not None
+    assert len(result["query_hash"]) == 64
+    assert result["source_config_hash"] is not None
+    assert result["parameters_hash"] is not None
+    assert result["source_data_hash"] is not None
+    assert result["result_hash"] is not None
+
     # 7. Check run history
     history = client.get(f"/api/workflows/{pid}/runs").json()
     assert len(history) == 1
     assert history[0]["status"] == "success"
+    assert history[0]["query_hash"] == result["query_hash"]
+    assert history[0]["source_config_hash"] == result["source_config_hash"]
+    assert history[0]["parameters_hash"] == result["parameters_hash"]
+    assert history[0]["source_data_hash"] == result["source_data_hash"]
+    assert history[0]["result_hash"] == result["result_hash"]
 
     # 8. Download results
     run_id = result["run_id"]
@@ -349,6 +363,39 @@ def test_full_workflow(client: TestClient) -> None:
     files = client.get(f"/api/workflows/{pid}/files").json()
     assert len(files) == 1
     assert files[0]["filename"] == "extra.csv"
+
+
+def test_run_creates_content_store_and_cas(client: TestClient, db: Session) -> None:
+    """Verify content_store entries and CAS files are created after a run."""
+    from app import config
+    from app.models.content_store import ContentStore
+    from app.services import cas
+
+    workflow = _create_workflow(client, name="CAS Test")
+    pid = workflow["id"]
+    csv_path = str(FIXTURES_DIR / "sample_meter_data.csv")
+    _add_source(client, pid, "file", "raw", {"file_path": csv_path, "file_type": "csv"})
+    client.put(f"/api/workflows/{pid}", json={"query": "SELECT * FROM raw"})
+
+    run_resp = client.post(f"/api/workflows/{pid}/run", json={"parameters": {}})
+    result = run_resp.json()
+    assert result["status"] == "success"
+
+    # Verify content_store has entries for query, source_config, parameters, source_data
+    for hash_val in [
+        result["query_hash"],
+        result["source_config_hash"],
+        result["parameters_hash"],
+        result["source_data_hash"],
+    ]:
+        entry = db.get(ContentStore, hash_val)
+        assert entry is not None, f"Missing content_store entry for {hash_val}"
+        assert len(entry.content) > 0
+
+    # Verify CAS file exists for result_hash
+    result_path = cas.get_file_path(config.settings.data_dir, result["result_hash"])
+    assert result_path is not None
+    assert result_path.exists()
 
 
 # ── Validate Query ──────────────────────────────────────────────

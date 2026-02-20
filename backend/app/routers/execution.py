@@ -29,6 +29,7 @@ from app.schemas.execution import (
     ValidateQueryRequest,
     ValidateQueryResponse,
 )
+from app.services import cas
 
 router = APIRouter(prefix="/api/workflows", tags=["execution"])
 
@@ -116,6 +117,30 @@ async def run_workflow(
     if exec_result.status == "success" and exec_result.schema_info:
         schema_info = exec_result.schema_info
 
+    # Compute provenance hashes for successful runs
+    query_hash: str | None = None
+    source_config_hash: str | None = None
+    parameters_hash: str | None = None
+    source_data_hash: str | None = None
+    result_hash: str | None = None
+
+    if exec_result.status == "success":
+        query_hash = cas.store_content(db, query, "query")
+        source_config_hash = cas.store_content(
+            db, cas.canonicalize_source_configs(sources), "source_config"
+        )
+        parameters_hash = cas.store_content(
+            db, cas.canonicalize_json(parameters), "parameters"
+        )
+        # Store source files in CAS
+        for _table_name, file_path in exec_result.source_file_paths.items():
+            cas.store_file(settings.data_dir, file_path)
+        source_data_hash = cas.store_content(
+            db, cas.canonicalize_json(exec_result.source_file_hashes), "source_data"
+        )
+        # Store result NDJSON in CAS (file-based, no FK)
+        result_hash = cas.store_bytes(settings.data_dir, exec_result.ndjson_result)
+
     # Store run in run_history (keep up to 10k rows for downloads)
     run_id = generate_cuid()
     now = datetime.now(UTC).isoformat()
@@ -133,7 +158,11 @@ async def run_workflow(
             _json_safe({"data": exec_result.data[:10_000]}) if exec_result.data else None
         ),
         error=exec_result.error,
-        source_hashes=exec_result.source_hashes or None,
+        query_hash=query_hash,
+        source_config_hash=source_config_hash,
+        parameters_hash=parameters_hash,
+        source_data_hash=source_data_hash,
+        result_hash=result_hash,
     )
     db.add(run)
     db.commit()
@@ -159,7 +188,11 @@ async def run_workflow(
         data=_json_safe(exec_result.data[:100]) if exec_result.data else None,
         schema_info=schema_info,
         error=exec_result.error,
-        source_hashes=exec_result.source_hashes or None,
+        query_hash=query_hash,
+        source_config_hash=source_config_hash,
+        parameters_hash=parameters_hash,
+        source_data_hash=source_data_hash,
+        result_hash=result_hash,
     )
 
 

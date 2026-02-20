@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -82,22 +83,19 @@ class DuckDBSession:
         assert row is not None
         return row[0]  # type: ignore[no-any-return]
 
-    def compute_source_hash(self, table_name: str) -> str:
-        """Compute a stable, order-independent content hash for a loaded table."""
+    def export_ndjson_sorted(self, table_name: str) -> bytes:
+        """Export table as deterministically sorted NDJSON (ORDER BY all columns)."""
         safe_name = _validate_table_name(table_name)
-        result = self.conn.execute(f"""
-            SELECT COALESCE(
-                md5(string_agg(row_hash ORDER BY row_hash)),
-                md5('')
-            )
-            FROM (
-                SELECT md5(concat_ws('|~|', COLUMNS(*)::VARCHAR)) AS row_hash
-                FROM {safe_name}
-            )
-        """)
-        row = result.fetchone()
-        assert row is not None
-        return str(row[0])
+        # Get column names for ORDER BY
+        schema = self.get_table_schema(safe_name)
+        order_cols = ", ".join(f'"{col["name"]}"' for col in schema)
+        result = self.conn.execute(f"SELECT * FROM {safe_name} ORDER BY {order_cols}")
+        columns = [desc[0] for desc in result.description]
+        lines: list[str] = []
+        for row in result.fetchall():
+            record = dict(zip(columns, row))
+            lines.append(json.dumps(record, sort_keys=True, separators=(",", ":"), default=str))
+        return "\n".join(lines).encode("utf-8")
 
     def validate_query(self, sql: str) -> str | None:
         """Validate a SQL query using EXPLAIN without executing it.

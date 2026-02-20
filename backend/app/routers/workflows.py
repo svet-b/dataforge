@@ -346,7 +346,11 @@ def list_runs(
             row_count=r.row_count,
             schema_info=r.schema_info,
             error=r.error,
-            source_hashes=r.source_hashes,
+            query_hash=r.query_hash,
+            source_config_hash=r.source_config_hash,
+            parameters_hash=r.parameters_hash,
+            source_data_hash=r.source_data_hash,
+            result_hash=r.result_hash,
         )
         for r in runs
     ]
@@ -370,5 +374,9 @@ def get_run(workflow_id: str, run_id: str, db: Session = Depends(get_db)) -> Run
         schema_info=run.schema_info,
         output_preview=run.output_preview,
         error=run.error,
-        source_hashes=run.source_hashes,
+        query_hash=run.query_hash,
+        source_config_hash=run.source_config_hash,
+        parameters_hash=run.parameters_hash,
+        source_data_hash=run.source_data_hash,
+        result_hash=run.result_hash,
     )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from app.config import Settings
@@ -9,6 +10,7 @@ from app.connectors.api_connector import APIConnector
 from app.connectors.file_connector import FileConnector
 from app.engine.cte_parser import extract_ctes
 from app.engine.duckdb_manager import DuckDBSession
+from app.services.cas import sha256_of_file
 
 
 class WorkflowExecutionError(Exception):
@@ -26,7 +28,9 @@ class ExecutionResult:
     data: list[dict[str, Any]] | None
     error: dict[str, Any] | None
     schema_info: list[dict[str, str]] = field(default_factory=list)
-    source_hashes: dict[str, str] = field(default_factory=dict)
+    source_file_hashes: dict[str, str] = field(default_factory=dict)
+    source_file_paths: dict[str, Path] = field(default_factory=dict)
+    ndjson_result: bytes = field(default=b"")
 
 
 @dataclass
@@ -74,10 +78,12 @@ class WorkflowExecutor:
                 session.set_variable(name, str(value))
 
             # 3. Load all sources
-            source_hashes: dict[str, str] = {}
+            source_file_hashes: dict[str, str] = {}
+            source_file_paths: dict[str, Path] = {}
             for source in sources:
-                h = await self._load_source(session, source, parameters)
-                source_hashes[source["table_name"]] = h
+                file_hash, file_path = await self._load_source(session, source, parameters)
+                source_file_hashes[source["table_name"]] = file_hash
+                source_file_paths[source["table_name"]] = file_path
 
             # 4. Execute the query
             session.execute_transform("_result", query)
@@ -87,6 +93,9 @@ class WorkflowExecutor:
             row_count = session.get_row_count("_result")
             data = session.get_table_data("_result", limit=preview_limit)
 
+            # 6. Export deterministic NDJSON of full result
+            ndjson_result = session.export_ndjson_sorted("_result")
+
             return ExecutionResult(
                 status="success",
                 duration_ms=int((time.monotonic() - start_time) * 1000),
@@ -94,7 +103,9 @@ class WorkflowExecutor:
                 data=data,
                 error=None,
                 schema_info=schema_info,
-                source_hashes=source_hashes,
+                source_file_hashes=source_file_hashes,
+                source_file_paths=source_file_paths,
+                ndjson_result=ndjson_result,
             )
 
         except WorkflowExecutionError as e:
@@ -122,7 +133,8 @@ class WorkflowExecutor:
         session: DuckDBSession,
         source: dict[str, Any],
         parameters: dict[str, Any],
-    ) -> str:
+    ) -> tuple[str, Path]:
+        """Load a source into DuckDB and return (SHA-256 of file, file path)."""
         config = source["config"]
         table_name = source["table_name"]
         env: dict[str, str] = {}  # populated from settings/environment in later stages
@@ -140,7 +152,10 @@ class WorkflowExecutor:
         elif source["type"] == "api":
             file_path = await self.api_connector.fetch(config, parameters, env)
             session.load_json(table_name, file_path)
-        return session.compute_source_hash(table_name)
+        else:
+            msg = f"Unknown source type: {source['type']}"
+            raise WorkflowExecutionError(msg)
+        return sha256_of_file(file_path), file_path
 
     async def inspect_ctes(
         self,
