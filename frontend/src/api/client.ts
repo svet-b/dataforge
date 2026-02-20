@@ -1,5 +1,6 @@
 import type {
   ChatMessage,
+  ContentResponse,
   WorkflowSummary,
   WorkflowResponse,
   WorkflowDetail,
@@ -15,6 +16,7 @@ import type {
   RunHistoryDetail,
   LlmStatus,
   CTEInspectionResponse,
+  QueryHistoryEntry,
   SourcePreviewResponse,
   SourceRawResponse,
   SourceSchemaResponse,
@@ -153,6 +155,11 @@ export const api = {
       ),
     get: (workflowId: string, runId: string) =>
       request<RunHistoryDetail>('GET', `/api/workflows/${workflowId}/runs/${runId}`),
+  },
+  content: {
+    get: (sha256: string) => request<ContentResponse>('GET', `/api/content/${sha256}`),
+    queryHistory: (workflowId: string) =>
+      request<QueryHistoryEntry[]>('GET', `/api/workflows/${workflowId}/query-history`),
   },
   download: {
     url: (workflowId: string, runId: string, format: 'csv' | 'json') =>

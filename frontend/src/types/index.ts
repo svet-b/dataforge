@@ -259,3 +259,20 @@ export interface SourceRawResponse {
   extracted_records: Record<string, unknown>[];
   extracted_count: number;
 }
+
+// Content store types
+
+export interface ContentResponse {
+  sha256: string;
+  kind: string;
+  content: string;
+  byte_size: number;
+}
+
+export interface QueryHistoryEntry {
+  query_hash: string;
+  query: string;
+  first_used: string;
+  last_used: string;
+  run_count: number;
+}

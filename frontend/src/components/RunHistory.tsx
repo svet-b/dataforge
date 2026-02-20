@@ -3,6 +3,7 @@ import { useRunsStore } from '@/stores/runs';
 import { api } from '@/api/client';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import type { RunHistorySummary } from '@/types';
+import ContentModal from './ContentModal';
 
 interface RunHistoryProps {
   workflowId: string;
@@ -16,6 +17,7 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
   const loadRunDetail = useRunsStore((s) => s.loadRunDetail);
 
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [contentHash, setContentHash] = useState<string | null>(null);
 
   useEffect(() => {
     loadRuns(workflowId);
@@ -65,6 +67,7 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
 
   return (
     <div className="divide-y divide-gray-100 overflow-y-auto">
+      <ContentModal hash={contentHash} onClose={() => setContentHash(null)} />
       {runs.map((run, runIndex) => {
         const prevRun = runs[runIndex + 1] ?? null;
         return (
@@ -121,6 +124,7 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
                       if (!hash) return null;
                       const prev = prevRun?.[key] as string | null | undefined;
                       const status = !prev ? 'new' : prev === hash ? 'same' : 'changed';
+                      const clickable = key !== 'result_hash';
                       return (
                         <div key={key} className="flex items-center gap-2">
                           <span className={
@@ -130,7 +134,14 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
                             {status === 'same' ? '=' : status === 'changed' ? '~' : '+'}
                           </span>
                           <span className="w-14 font-medium text-gray-700">{label}</span>
-                          <span className="font-mono text-gray-400" title={hash}>{hash.slice(0, 12)}</span>
+                          <button
+                            className={`font-mono ${clickable ? 'cursor-pointer text-blue-500 hover:text-blue-700 hover:underline' : 'cursor-default text-gray-400'}`}
+                            title={hash}
+                            onClick={() => clickable && setContentHash(hash)}
+                            disabled={!clickable}
+                          >
+                            {hash.slice(0, 12)}
+                          </button>
                           {status === 'changed' && (
                             <span className="text-amber-600">changed</span>
                           )}
