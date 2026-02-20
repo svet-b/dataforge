@@ -15,6 +15,7 @@ class RunResponse(BaseModel):
     data: list[dict[str, Any]] | None
     schema_info: list[dict[str, str]]
     error: dict[str, Any] | None
+    source_hashes: dict[str, str] | None = None
 
 
 class SourcePreviewResult(BaseModel):

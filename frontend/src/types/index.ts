@@ -79,6 +79,7 @@ export interface RunResponse {
   data: Record<string, unknown>[] | null;
   schema_info: SchemaColumn[];
   error: ExecutionError | null;
+  source_hashes?: Record<string, string> | null;
 }
 
 export interface UploadedFileResponse {
@@ -104,11 +105,13 @@ export interface RunHistorySummary {
   row_count: number | null;
   schema_info: SchemaColumn[] | null;
   error: ExecutionError | null;
+  source_hashes?: Record<string, string> | null;
 }
 
 export interface RunHistoryDetail extends RunHistorySummary {
   completed_at: string | null;
   output_preview: Record<string, unknown>[] | null;
+  source_hashes?: Record<string, string> | null;
 }
 
 // LLM types

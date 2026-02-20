@@ -135,6 +135,7 @@ async def run_workflow(
             _json_safe({"data": exec_result.data[:10_000]}) if exec_result.data else None
         ),
         error=exec_result.error,
+        source_hashes=exec_result.source_hashes or None,
     )
     db.add(run)
     db.commit()
@@ -160,6 +161,7 @@ async def run_workflow(
         data=_json_safe(exec_result.data[:100]) if exec_result.data else None,
         schema_info=schema_info,
         error=exec_result.error,
+        source_hashes=exec_result.source_hashes or None,
     )
 
 

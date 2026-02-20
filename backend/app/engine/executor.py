@@ -26,6 +26,7 @@ class ExecutionResult:
     data: list[dict[str, Any]] | None
     error: dict[str, Any] | None
     schema_info: list[dict[str, str]] = field(default_factory=list)
+    source_hashes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -73,8 +74,10 @@ class WorkflowExecutor:
                 session.set_variable(name, str(value))
 
             # 3. Load all sources
+            source_hashes: dict[str, str] = {}
             for source in sources:
-                await self._load_source(session, source, parameters)
+                h = await self._load_source(session, source, parameters)
+                source_hashes[source["table_name"]] = h
 
             # 4. Execute the query
             session.execute_transform("_result", query)
@@ -91,6 +94,7 @@ class WorkflowExecutor:
                 data=data,
                 error=None,
                 schema_info=schema_info,
+                source_hashes=source_hashes,
             )
 
         except WorkflowExecutionError as e:
@@ -118,7 +122,7 @@ class WorkflowExecutor:
         session: DuckDBSession,
         source: dict[str, Any],
         parameters: dict[str, Any],
-    ) -> None:
+    ) -> str:
         config = source["config"]
         table_name = source["table_name"]
         env: dict[str, str] = {}  # populated from settings/environment in later stages
@@ -136,6 +140,7 @@ class WorkflowExecutor:
         elif source["type"] == "api":
             file_path = await self.api_connector.fetch(config, parameters, env)
             session.load_json(table_name, file_path)
+        return session.compute_source_hash(table_name)
 
     async def inspect_ctes(
         self,

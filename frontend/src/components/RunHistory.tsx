@@ -56,8 +56,11 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
 
   return (
     <div className="divide-y divide-gray-100 overflow-y-auto">
-      {runs.map((run) => (
-        <div key={run.id}>
+      {runs.map((run, runIndex) => {
+        const prevHashes = runs[runIndex + 1]?.source_hashes ?? null;
+        const hashes = expandedRunId === run.id ? expandedRun?.source_hashes : null;
+        return (
+          <div key={run.id}>
           <button
             className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-gray-50"
             onClick={() => toggleExpand(run.id)}
@@ -101,6 +104,36 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
                 </div>
               )}
 
+              {hashes && Object.keys(hashes).length > 0 && (
+                <div className="mb-2">
+                  <span className="font-semibold text-gray-600">Sources:</span>
+                  <div className="mt-0.5 space-y-0.5">
+                    {Object.entries(hashes).map(([table, hash]) => {
+                      const prev = prevHashes?.[table];
+                      const status = !prev ? 'new' : prev === hash ? 'same' : 'changed';
+                      return (
+                        <div key={table} className="flex items-center gap-2">
+                          <span className={
+                            status === 'same' ? 'text-green-500' :
+                            status === 'changed' ? 'text-amber-500' : 'text-gray-400'
+                          }>
+                            {status === 'same' ? '✓' : status === 'changed' ? '!' : '·'}
+                          </span>
+                          <span className="font-medium text-gray-700">{table}</span>
+                          <span className="font-mono text-gray-400" title={hash}>{hash.slice(0, 8)}</span>
+                          {status === 'same' && (
+                            <span className="text-green-600">unchanged</span>
+                          )}
+                          {status === 'changed' && (
+                            <span className="text-amber-600">changed</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {run.status === 'success' && (
                 <div className="flex gap-2">
                   <a
@@ -121,8 +154,9 @@ export default function RunHistory({ workflowId }: RunHistoryProps) {
               )}
             </div>
           )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

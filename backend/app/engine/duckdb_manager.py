@@ -82,6 +82,23 @@ class DuckDBSession:
         assert row is not None
         return row[0]  # type: ignore[no-any-return]
 
+    def compute_source_hash(self, table_name: str) -> str:
+        """Compute a stable, order-independent content hash for a loaded table."""
+        safe_name = _validate_table_name(table_name)
+        result = self.conn.execute(f"""
+            SELECT COALESCE(
+                md5(string_agg(row_hash ORDER BY row_hash)),
+                md5('')
+            )
+            FROM (
+                SELECT md5(concat_ws('|~|', COLUMNS(*)::VARCHAR)) AS row_hash
+                FROM {safe_name}
+            )
+        """)
+        row = result.fetchone()
+        assert row is not None
+        return str(row[0])
+
     def validate_query(self, sql: str) -> str | None:
         """Validate a SQL query using EXPLAIN without executing it.
 
