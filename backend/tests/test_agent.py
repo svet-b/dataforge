@@ -68,6 +68,8 @@ def _make_response(blocks: list[MagicMock], stop_reason: str = "tool_use") -> Ma
     resp = MagicMock()
     resp.content = blocks
     resp.stop_reason = stop_reason
+    resp.usage.input_tokens = 100
+    resp.usage.output_tokens = 50
     return resp
 
 
@@ -99,21 +101,6 @@ class TestRunSql:
     def test_sql_error(self) -> None:
         ctx = _make_ctx({})
         result = json.loads(_execute_tool(ctx, "run_sql", {"sql": "SELECT * FROM nonexistent"}))
-        assert "error" in result
-        ctx.session.close()
-
-
-class TestValidateSql:
-    def test_valid_query(self) -> None:
-        ctx = _make_ctx({"t": [{"x": "1"}]})
-        result = json.loads(_execute_tool(ctx, "validate_sql", {"sql": "SELECT * FROM t"}))
-        assert result["valid"] is True
-        ctx.session.close()
-
-    def test_invalid_query(self) -> None:
-        ctx = _make_ctx({})
-        result = json.loads(_execute_tool(ctx, "validate_sql", {"sql": "SELECT * FROM nope"}))
-        assert result["valid"] is False
         assert "error" in result
         ctx.session.close()
 
@@ -189,24 +176,27 @@ async def test_agent_simple_submit() -> None:
     async for event in run_agent(provider, "system", "get all rows", ctx):
         events.append(event)
 
-    assert len(events) == 1
-    assert events[0].type == "result"
-    assert events[0].data["sql"] == "SELECT * FROM t"
-    assert events[0].data["explanation"] == "All rows"
+    assert len(events) == 2
+    assert events[0].type == "usage"
+    assert events[0].data["input_tokens"] == 100
+    assert events[0].data["output_tokens"] == 50
+    assert events[1].type == "result"
+    assert events[1].data["sql"] == "SELECT * FROM t"
+    assert events[1].data["explanation"] == "All rows"
     ctx.session.close()
 
 
 @pytest.mark.asyncio
 async def test_agent_multi_step() -> None:
-    """Agent calls get_schemas then submit_sql."""
+    """Agent calls sample_data then submit_sql."""
     ctx = _make_ctx({"orders": [{"id": "1"}]})
     provider = AsyncMock()
 
-    # First call: get_schemas
+    # First call: sample_data
     resp1 = _make_response(
         [
             _make_text_block("Let me check the schemas."),
-            _make_tool_use_block("t1", "get_schemas", {}),
+            _make_tool_use_block("t1", "sample_data", {"table_name": "orders", "limit": 1}),
         ]
     )
     # Second call: submit_sql
@@ -276,9 +266,12 @@ async def test_agent_text_only_yields_message() -> None:
     async for event in run_agent(provider, "system", "do something", ctx):
         events.append(event)
 
-    assert len(events) == 1
-    assert events[0].type == "message"
-    assert events[0].data["text"] == "I can't help with that."
+    assert len(events) == 2
+    assert events[0].type == "usage"
+    assert events[0].data["input_tokens"] == 100
+    assert events[0].data["output_tokens"] == 50
+    assert events[1].type == "message"
+    assert events[1].data["text"] == "I can't help with that."
     ctx.session.close()
 
 
@@ -292,7 +285,7 @@ async def test_agent_max_iterations() -> None:
     provider.generate_with_tools = AsyncMock(
         return_value=_make_response(
             [
-                _make_tool_use_block("t1", "get_schemas", {}),
+                _make_tool_use_block("t1", "sample_data", {"table_name": "t", "limit": 1}),
             ]
         )
     )

@@ -23,11 +23,12 @@ from app.llm.events import (
     thinking_event,
     tool_call_event,
     tool_result_event,
+    usage_event,
 )
 
 logger = logging.getLogger(__name__)
 
-MAX_ITERATIONS = 20
+MAX_ITERATIONS = 12
 SQL_TIMEOUT_SECONDS = 60
 MAX_RESULT_ROWS = 50
 # Hard cap on tool result strings added to message history (~2k tokens).
@@ -65,20 +66,6 @@ AGENT_TOOLS: list[ToolParam] = [
                 "sql": {
                     "type": "string",
                     "description": "The SQL query to execute.",
-                },
-            },
-            "required": ["sql"],
-        },
-    },
-    {
-        "name": "validate_sql",
-        "description": "Check if a SQL query is valid without executing it (uses EXPLAIN).",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "sql": {
-                    "type": "string",
-                    "description": "The SQL query to validate.",
                 },
             },
             "required": ["sql"],
@@ -190,13 +177,6 @@ def _execute_tool(ctx: AgentContext, tool_name: str, tool_input: dict[str, Any])
         except duckdb.Error as e:
             return json.dumps({"error": str(e)})
 
-    if tool_name == "validate_sql":
-        sql = tool_input["sql"]
-        error = ctx.session.validate_query(sql)
-        if error is None:
-            return json.dumps({"valid": True})
-        return json.dumps({"valid": False, "error": error})
-
     if tool_name == "get_current_query":
         if ctx.current_query and ctx.current_query.strip():
             return ctx.current_query
@@ -213,9 +193,15 @@ async def run_agent(
     system_prompt: str,
     user_message: str,
     ctx: AgentContext,
+    initial_messages: list[MessageParam] | None = None,
 ) -> AsyncIterator[AgentEvent]:
     """Run the agent loop, yielding SSE events for each step."""
-    messages: list[MessageParam] = [{"role": "user", "content": user_message}]
+    messages: list[MessageParam] = []
+    if initial_messages:
+        messages.extend(initial_messages)
+    messages.append({"role": "user", "content": user_message})
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     for iteration in range(1, MAX_ITERATIONS + 1):
         try:
@@ -232,6 +218,18 @@ async def run_agent(
             logger.error("Anthropic API error in agent loop: %s", e)
             yield error_event(f"API error: {e.message}")
             return
+
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        total_input_tokens += input_tokens
+        total_output_tokens += output_tokens
+        yield usage_event(
+            iteration=iteration,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_input_tokens=total_input_tokens,
+            total_output_tokens=total_output_tokens,
+        )
 
         # Collect text blocks and tool use blocks
         text_parts: list[str] = []
@@ -287,7 +285,9 @@ async def run_agent(
                     timeout=SQL_TIMEOUT_SECONDS,
                 )
             except TimeoutError:
-                result_str = json.dumps({"error": "Query timed out after 10 seconds."})
+                result_str = json.dumps(
+                    {"error": f"Query timed out after {SQL_TIMEOUT_SECONDS} seconds."}
+                )
             except Exception as e:
                 result_str = json.dumps({"error": str(e)})
             duration_ms = int((time.monotonic() - start) * 1000)

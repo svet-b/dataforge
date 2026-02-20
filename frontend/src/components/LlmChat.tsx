@@ -23,6 +23,10 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
   const [llmAvailable, setLlmAvailable] = useState(true);
   const [lastResult, setLastResult] = useState<{ sql: string; explanation: string } | null>(null);
   const [lastExchange, setLastExchange] = useState<{ prompt: string; reply: string } | null>(null);
+  const [tokenTotals, setTokenTotals] = useState<{ input: number; output: number }>({
+    input: 0,
+    output: 0,
+  });
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -55,6 +59,7 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
     await api.chat.clear(workflowId).catch(() => {/* silently ignore */});
     setMessages([]);
     setLastResult(null);
+    setTokenTotals({ input: 0, output: 0 });
   }
 
   const scrollToBottom = useCallback(() => {
@@ -82,11 +87,21 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
     setLoading(true);
     setCurrentTool(null);
     setPendingSteps([]);
+    setTokenTotals({ input: 0, output: 0 });
     scrollToBottom();
 
-    // Build conversation summary from last result or last exchange
+    // Build a compact rolling context summary.
     let conversationSummary: string | null = null;
-    if (lastResult) {
+    const recentContext = messages.slice(-6);
+    if (recentContext.length > 0) {
+      const parts = recentContext.map((m) => {
+        const role = m.role === 'assistant' ? 'Assistant' : 'User';
+        const content = m.content.length > 450 ? `${m.content.slice(0, 450)}...` : m.content;
+        const sql = m.sql ? `\nSQL:\n${m.sql.length > 450 ? `${m.sql.slice(0, 450)}...` : m.sql}` : '';
+        return `${role}: ${content}${sql}`;
+      });
+      conversationSummary = `Recent conversation context:\n${parts.join('\n\n')}`;
+    } else if (lastResult) {
       conversationSummary =
         `Previous SQL:\n\`\`\`sql\n${lastResult.sql}\n\`\`\`\n\n` +
         `Explanation: ${lastResult.explanation}`;
@@ -96,7 +111,6 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
     }
 
     const steps: AgentToolStep[] = [];
-    let thinkingText = '';
 
     const controller = streamAgentChat(
       workflowId,
@@ -129,8 +143,14 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
           scrollToBottom();
         },
         onThinking: (event) => {
-          thinkingText = event.text;
+          void event;
           scrollToBottom();
+        },
+        onUsage: (event) => {
+          setTokenTotals({
+            input: event.total_input_tokens,
+            output: event.total_output_tokens,
+          });
         },
         onResult: (event) => {
           const assistantMsg: AgentMessage = {
@@ -195,17 +215,24 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
           AI Assistant
         </h3>
-        {messages.length > 0 && !loading && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-gray-400 hover:text-gray-600"
-            onClick={clearChat}
-            title="Clear chat history"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {(tokenTotals.input > 0 || tokenTotals.output > 0) && (
+            <span className="text-[11px] text-gray-400" title="Tokens used in current generation">
+              in {tokenTotals.input.toLocaleString()} / out {tokenTotals.output.toLocaleString()}
+            </span>
+          )}
+          {messages.length > 0 && !loading && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-gray-400 hover:text-gray-600"
+              onClick={clearChat}
+              title="Clear chat history"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {!llmAvailable ? (

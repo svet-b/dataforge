@@ -33,11 +33,6 @@ def thinking_event(text: str, iteration: int) -> AgentEvent:
     return AgentEvent(type="thinking", data={"text": text, "iteration": iteration})
 
 
-def message_event(text: str) -> AgentEvent:
-    """Plain conversational reply from the agent (no SQL produced)."""
-    return AgentEvent(type="message", data={"text": text})
-
-
 def result_event(sql: str, explanation: str) -> AgentEvent:
     return AgentEvent(type="result", data={"sql": sql, "explanation": explanation})
 
@@ -45,6 +40,25 @@ def result_event(sql: str, explanation: str) -> AgentEvent:
 def message_event(text: str) -> AgentEvent:
     """Conversational response — agent replied with text but no SQL was generated."""
     return AgentEvent(type="message", data={"text": text})
+
+
+def usage_event(
+    iteration: int,
+    input_tokens: int,
+    output_tokens: int,
+    total_input_tokens: int,
+    total_output_tokens: int,
+) -> AgentEvent:
+    return AgentEvent(
+        type="usage",
+        data={
+            "iteration": iteration,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_input_tokens": total_input_tokens,
+            "total_output_tokens": total_output_tokens,
+        },
+    )
 
 
 def error_event(message: str) -> AgentEvent:

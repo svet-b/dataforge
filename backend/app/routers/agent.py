@@ -5,6 +5,7 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
+from anthropic.types import MessageParam
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -27,12 +28,34 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/workflows", tags=["agent"])
 
 _provider = create_llm_provider(settings)
+MAX_HISTORY_MESSAGES = 8
+MAX_HISTORY_TEXT_CHARS = 1_200
 
 
 class AgentChatRequest(BaseModel):
     prompt: str
     conversation_summary: str | None = None
     current_query: str | None = None
+
+
+def _truncate_text(text: str, max_chars: int = MAX_HISTORY_TEXT_CHARS) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 32].rstrip() + "\n\n[... truncated ...]"
+
+
+def _chat_history_to_messages(history: list[ChatMessage]) -> list[MessageParam]:
+    """Convert persisted chat rows to Anthropic message params with size bounds."""
+    messages: list[MessageParam] = []
+    for item in history:
+        role = "assistant" if item.role == "assistant" else "user"
+        content = item.content
+        if item.role == "assistant" and item.sql:
+            content = f"{content}\n\nSQL:\n```sql\n{item.sql}\n```"
+        if item.is_error:
+            content = f"[error]\n{content}"
+        messages.append({"role": role, "content": _truncate_text(content)})
+    return messages
 
 
 async def _create_agent_context(
@@ -199,6 +222,15 @@ async def agent_chat(
     db.add(user_msg)
     db.commit()
 
+    recent_history = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.workflow_id == workflow_id, ChatMessage.id != user_msg.id)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(MAX_HISTORY_MESSAGES)
+        .all()
+    )
+    initial_messages = _chat_history_to_messages(list(reversed(recent_history)))
+
     ctx, table_schemas = await _create_agent_context(sources, parameters, current_query)
 
     param_info: list[dict[str, object]] = []
@@ -213,7 +245,13 @@ async def agent_chat(
         conversation_summary=body.conversation_summary,
     )
 
-    agent_events = run_agent(_provider, system_prompt, body.prompt, ctx)
+    agent_events = run_agent(
+        _provider,
+        system_prompt,
+        body.prompt,
+        ctx,
+        initial_messages=initial_messages,
+    )
 
     return EventSourceResponse(
         _event_stream(agent_events, ctx.session, workflow_id),

@@ -167,8 +167,12 @@ export interface AgentErrorEvent {
   message: string;
 }
 
-export interface AgentMessageEvent {
-  text: string;
+export interface AgentUsageEvent {
+  iteration: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
 }
 
 export interface AgentToolStep {

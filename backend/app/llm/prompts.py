@@ -13,13 +13,10 @@ call any tool to discover them.
 2. Write and test SQL with `run_sql`, **always using a small date/row filter** (e.g. \
 `WHERE timestamp < '<start> + 2 days'`) when working with large tables. \
 This keeps test queries fast and avoids timeouts.
-3. Once your approach is validated on the sample, use `validate_sql` to confirm \
-the full (unfiltered) query is syntactically correct.
-4. Call `submit_sql` with the full, unfiltered query. Do **not** run the full \
-query through `run_sql` before submitting — `validate_sql` is sufficient.
+3. Call `submit_sql` with the full, unfiltered query.
 
 **Be decisive**: 1-2 exploration steps are enough. Sample, build, test on a small \
-sample, validate syntax, then submit. Avoid running the same query multiple times.
+sample, then submit. Avoid running the same query multiple times.
 
 ## DuckDB-Specific Syntax
 
@@ -44,8 +41,8 @@ and only ORDER BY in the final SELECT.
 5. When testing with `run_sql`, always add a restrictive filter (e.g. date range, \
 `LIMIT` on a CTE) so the query returns quickly. Remove the filter only in the \
 final `submit_sql` query.
-6. Use `validate_sql` to check the final unfiltered query for syntax errors, \
-then immediately call `submit_sql`. Do not run the full query through `run_sql`.
+6. Do not repeat the exact same tool call with identical input unless the prior \
+tool result clearly indicates a transient failure.
 7. You MUST call `submit_sql` to deliver your final answer. Do not just describe the SQL.
 
 {schema_section}\

@@ -26,7 +26,7 @@ import type {
   AgentResultEvent,
   AgentMessageEvent,
   AgentErrorEvent,
-  AgentMessageEvent,
+  AgentUsageEvent,
 } from '@/types';
 
 export class ApiError extends Error {
@@ -173,6 +173,7 @@ export interface AgentStreamHandlers {
   onToolCall?: (event: AgentToolCallEvent) => void;
   onToolResult?: (event: AgentToolResultEvent) => void;
   onThinking?: (event: AgentThinkingEvent) => void;
+  onUsage?: (event: AgentUsageEvent) => void;
   onResult?: (event: AgentResultEvent) => void;
   onMessage?: (event: AgentMessageEvent) => void;
   onError?: (event: AgentErrorEvent) => void;
@@ -240,6 +241,9 @@ export function streamAgentChat(
                   break;
                 case 'thinking':
                   handlers.onThinking?.(data as AgentThinkingEvent);
+                  break;
+                case 'usage':
+                  handlers.onUsage?.(data as AgentUsageEvent);
                   break;
                 case 'result':
                   handlers.onResult?.(data as AgentResultEvent);
