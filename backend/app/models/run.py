@@ -3,13 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from cuid2 import cuid_wrapper
 from sqlalchemy import JSON, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.ids import generate_cuid
 from app.models.base import Base
-
-generate_cuid = cuid_wrapper()
 
 if TYPE_CHECKING:
     from app.models.workflow import Workflow

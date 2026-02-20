@@ -5,12 +5,12 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from cuid2 import cuid_wrapper
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.ids import generate_cuid
 from app.models.run import RunHistory
 from app.models.source import Source
 from app.models.uploaded_file import UploadedFile
@@ -25,8 +25,6 @@ from app.schemas.workflow import (
     WorkflowSummaryResponse,
     WorkflowUpdate,
 )
-
-generate_cuid = cuid_wrapper()
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
