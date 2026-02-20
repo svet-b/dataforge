@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class ClaudeProvider:
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5-20250929") -> None:
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-6") -> None:
         self.client = anthropic.AsyncAnthropic(api_key=api_key)
         self.model = model
 

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     max_run_history: int = 20
 
     # LLM (used in later stages)
-    llm_model: str = "claude-sonnet-4-5-20250929"
+    llm_model: str = "claude-sonnet-4-6"
     anthropic_api_key: str = ""
 
     # Execution (used in later stages)
