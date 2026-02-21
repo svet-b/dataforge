@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { RunHistorySummary, RunHistoryDetail } from '@/types';
-import { api, ApiError } from '@/api/client';
+import { api } from '@/api/client';
+import { errorMsg } from '@/utils/errorMsg';
 
 interface RunsState {
   runs: RunHistorySummary[];
@@ -22,8 +23,7 @@ export const useRunsStore = create<RunsState>((set) => ({
       const runs = await api.runs.list(workflowId);
       set({ runs, expandedRun: null, loading: false });
     } catch (e) {
-      const msg = e instanceof ApiError ? e.detail : e instanceof Error ? e.message : String(e);
-      console.error('Failed to load runs:', msg);
+      console.error('Failed to load runs:', errorMsg(e));
       set({ loading: false });
     }
   },
@@ -33,8 +33,7 @@ export const useRunsStore = create<RunsState>((set) => ({
       const detail = await api.runs.get(workflowId, runId);
       set({ expandedRun: detail });
     } catch (e) {
-      const msg = e instanceof ApiError ? e.detail : e instanceof Error ? e.message : String(e);
-      console.error('Failed to load run detail:', msg);
+      console.error('Failed to load run detail:', errorMsg(e));
     }
   },
 

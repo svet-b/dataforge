@@ -24,10 +24,11 @@ class DuckDBSession:
         self.conn = duckdb.connect(":memory:")
         self.conn.execute(f"SET memory_limit = '{memory_limit_mb}MB'")
 
-    def set_variable(self, name: str, value: str, var_type: str = "VARCHAR") -> None:
+    def set_variable(self, name: str, value: str) -> None:
         """Set a DuckDB session variable for workflow parameter injection."""
         _validate_table_name(name)  # variable names follow same rules
-        self.conn.execute(f"SET VARIABLE {name} = '{value}'")
+        escaped_value = value.replace("'", "''")
+        self.conn.execute(f"SET VARIABLE {name} = '{escaped_value}'")
 
     def load_json(self, table_name: str, file_path: Path) -> None:
         """Load a JSON/ndjson file into a named table."""
@@ -80,7 +81,8 @@ class DuckDBSession:
         safe_name = _validate_table_name(table_name)
         result = self.conn.execute(f"SELECT COUNT(*) FROM {safe_name}")
         row = result.fetchone()
-        assert row is not None
+        if row is None:
+            return 0
         return row[0]  # type: ignore[no-any-return]
 
     def export_ndjson_sorted(self, table_name: str) -> bytes:

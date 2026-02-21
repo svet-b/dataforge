@@ -58,7 +58,6 @@ class WorkflowExecutor:
 
     async def execute(
         self,
-        workflow_id: str,
         sources: list[dict[str, Any]],
         query: str,
         parameters: dict[str, Any],
@@ -81,7 +80,7 @@ class WorkflowExecutor:
             source_file_hashes: dict[str, str] = {}
             source_file_paths: dict[str, Path] = {}
             for source in sources:
-                file_hash, file_path = await self._load_source(session, source, parameters)
+                file_hash, file_path = await self.load_source(session, source, parameters)
                 source_file_hashes[source["table_name"]] = file_hash
                 source_file_paths[source["table_name"]] = file_path
 
@@ -128,7 +127,7 @@ class WorkflowExecutor:
             if session:
                 session.close()
 
-    async def _load_source(
+    async def load_source(
         self,
         session: DuckDBSession,
         source: dict[str, Any],
@@ -159,7 +158,6 @@ class WorkflowExecutor:
 
     async def inspect_ctes(
         self,
-        workflow_id: str,
         sources: list[dict[str, Any]],
         query: str,
         parameters: dict[str, Any],
@@ -185,7 +183,7 @@ class WorkflowExecutor:
                 session.set_variable(name, str(value))
 
             for source in sources:
-                await self._load_source(session, source, parameters)
+                await self.load_source(session, source, parameters)
 
             cte_results: list[CTEResult] = []
             for info in cte_infos:

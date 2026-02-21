@@ -29,7 +29,7 @@ async def test_simple_workflow_execution(executor: WorkflowExecutor) -> None:
     query = "SELECT meter_id, SUM(energy_kwh) AS total FROM raw_data GROUP BY meter_id"
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},
@@ -66,7 +66,7 @@ async def test_workflow_with_parameters(executor: WorkflowExecutor) -> None:
     query = "SELECT * FROM raw_data WHERE meter_id = getvariable('target_meter')"
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={"target_meter": "M-001"},
@@ -93,7 +93,7 @@ async def test_transform_error_handling(executor: WorkflowExecutor) -> None:
     query = "SELECT nonexistent_column FROM raw_data"
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},
@@ -130,7 +130,7 @@ async def test_multiple_sources_with_join(executor: WorkflowExecutor) -> None:
     )
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},
@@ -156,7 +156,7 @@ async def test_preview_with_limit(executor: WorkflowExecutor) -> None:
     query = "SELECT * FROM raw_data"
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},
@@ -194,7 +194,7 @@ async def test_cte_query(executor: WorkflowExecutor) -> None:
     """
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},

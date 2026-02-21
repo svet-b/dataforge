@@ -13,6 +13,7 @@ import {
   Colors,
 } from 'chart.js';
 import type { SchemaColumn } from '@/types';
+import { NUMERIC_TYPE_RE } from '@/utils/columnTypes';
 
 Chart.register(
   BarController,
@@ -35,7 +36,6 @@ interface ResultsChartProps {
   schema: SchemaColumn[];
 }
 
-const NUMERIC_TYPE_RE = /^(INTEGER|BIGINT|SMALLINT|TINYINT|HUGEINT|FLOAT|DOUBLE|DECIMAL|NUMERIC|REAL|INT|UBIGINT|UINTEGER|USMALLINT|UTINYINT)/i;
 const STRING_DATE_RE = /^(VARCHAR|TEXT|STRING|CHAR|DATE|TIMESTAMP|DATETIME|TIME)/i;
 
 const PALETTE = [

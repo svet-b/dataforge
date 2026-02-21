@@ -37,7 +37,7 @@ async def test_inspect_single_cte(executor: WorkflowExecutor) -> None:
     SELECT * FROM totals WHERE total > 40
     """
     result = await executor.inspect_ctes(
-        workflow_id="test",
+
         sources=_csv_sources(),
         query=query,
         parameters={},
@@ -69,7 +69,7 @@ async def test_inspect_multiple_ctes(executor: WorkflowExecutor) -> None:
     SELECT * FROM step2
     """
     result = await executor.inspect_ctes(
-        workflow_id="test",
+
         sources=_csv_sources(),
         query=query,
         parameters={},
@@ -89,7 +89,7 @@ async def test_inspect_multiple_ctes(executor: WorkflowExecutor) -> None:
 async def test_inspect_no_ctes(executor: WorkflowExecutor) -> None:
     query = "SELECT * FROM raw_data"
     result = await executor.inspect_ctes(
-        workflow_id="test",
+
         sources=_csv_sources(),
         query=query,
         parameters={},

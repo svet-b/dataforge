@@ -65,7 +65,8 @@ def build_agent_system_prompt(
         for t in tables:
             name = t["name"]
             cols = t.get("columns", [])
-            assert isinstance(cols, list)
+            if not isinstance(cols, list):
+                cols = []
             row_count = t.get("row_count")
             col_str = ", ".join(f"{c['name']} ({c['type']})" for c in cols)
             count_str = f" — {row_count:,} rows" if isinstance(row_count, int) else ""

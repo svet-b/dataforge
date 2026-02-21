@@ -77,7 +77,7 @@ async def _create_agent_context(
     executor = WorkflowExecutor(settings)
     table_names: list[str] = []
     for source in sources:
-        await executor._load_source(session, source, parameters)
+        await executor.load_source(session, source, parameters)
         table_names.append(source["table_name"])
 
     # Compute schemas once — embedded in system prompt, no tool call needed
@@ -233,10 +233,9 @@ async def agent_chat(
 
     ctx, table_schemas = await _create_agent_context(sources, parameters, current_query)
 
-    param_info: list[dict[str, object]] = []
-    for p in workflow.parameters:
-        assert isinstance(p, dict)
-        param_info.append(p)
+    param_info: list[dict[str, object]] = [
+        p for p in workflow.parameters if isinstance(p, dict)
+    ]
 
     system_prompt = build_agent_system_prompt(
         tables=table_schemas,

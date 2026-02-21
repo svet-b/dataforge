@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
@@ -80,16 +80,4 @@ export default function SqlEditor({ value, onChange, onRunPreview, placeholder =
   return (
     <div ref={containerRef} className="min-h-[120px] overflow-hidden rounded border border-gray-300" />
   );
-}
-
-// Imperative handle for setting SQL from parent
-export function useSqlEditorRef() {
-  const valueRef = useRef('');
-  const setterRef = useRef<((sql: string) => void) | null>(null);
-
-  const setSql = useCallback((sql: string) => {
-    setterRef.current?.(sql);
-  }, []);
-
-  return { valueRef, setterRef, setSql };
 }
