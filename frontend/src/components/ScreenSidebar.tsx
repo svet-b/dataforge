@@ -17,7 +17,7 @@ const screens: { id: Screen; label: string; icon: typeof Database; disabled?: bo
 
 export default function ScreenSidebar({ activeScreen, onScreenChange }: ScreenSidebarProps) {
   return (
-    <div className="flex w-12 shrink-0 flex-col items-center border-r border-gray-200 bg-gray-50 py-3">
+    <div className="flex w-12 shrink-0 flex-col items-center bg-gray-900 py-3">
       {screens.map(({ id, label, icon: Icon, disabled }) => {
         const isActive = activeScreen === id;
         return (
@@ -27,15 +27,15 @@ export default function ScreenSidebar({ activeScreen, onScreenChange }: ScreenSi
                 disabled={disabled}
                 className={`relative mb-1 flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
                   disabled
-                    ? 'cursor-not-allowed text-gray-300'
+                    ? 'cursor-not-allowed text-gray-600'
                     : isActive
-                      ? 'bg-gray-200 text-gray-900'
-                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                      ? 'bg-gray-700 text-white'
+                      : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
                 }`}
                 onClick={() => !disabled && onScreenChange(id)}
               >
                 {isActive && (
-                  <div className="absolute left-0 top-1.5 h-5 w-0.5 rounded-r bg-blue-500" />
+                  <div className="absolute left-0 top-1.5 h-5 w-0.5 rounded-r bg-blue-400" />
                 )}
                 <Icon className="h-5 w-5" />
               </button>
