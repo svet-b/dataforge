@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Markdown from 'react-markdown';
-import { api } from '@/api/client';
-import { streamAgentChat } from '@/api/client';
+import { api, streamAgentChat } from '@/api/client';
 import { useWorkflowStore } from '@/stores/workflow';
 import type { AgentMessage, AgentToolStep } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronRight, Loader2, Square, Trash2 } from 'lucide-react';
+import { Loader2, Square, Trash2 } from 'lucide-react';
+import MarkdownContent from './MarkdownContent';
+import ToolTrace from './ToolTrace';
 
 interface LlmChatProps {
   workflowId: string;
@@ -325,110 +325,4 @@ export default function LlmChat({ workflowId, onSqlGenerated }: LlmChatProps) {
       )}
     </div>
   );
-}
-
-function MarkdownContent({ content, isError }: { content: string; isError?: boolean }) {
-  const color = isError ? 'text-red-600' : 'text-gray-600';
-  return (
-    <div className={`text-sm ${color}`}>
-    <Markdown
-      components={{
-        p: ({ children }) => <p className="mb-1.5 last:mb-0">{children}</p>,
-        h1: ({ children }) => <p className="mb-1 font-semibold">{children}</p>,
-        h2: ({ children }) => <p className="mb-1 font-semibold">{children}</p>,
-        h3: ({ children }) => <p className="mb-1 font-medium">{children}</p>,
-        ul: ({ children }) => <ul className="mb-1.5 list-disc pl-4 last:mb-0">{children}</ul>,
-        ol: ({ children }) => <ol className="mb-1.5 list-decimal pl-4 last:mb-0">{children}</ol>,
-        li: ({ children }) => <li className="mb-0.5">{children}</li>,
-        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-        pre: ({ children }) => (
-          <pre className="mb-1.5 overflow-x-auto rounded bg-gray-50 p-2 font-mono text-xs last:mb-0">
-            {children}
-          </pre>
-        ),
-        code: ({ children, className }) =>
-          className ? (
-            <code className={className}>{children}</code>
-          ) : (
-            <code className="rounded bg-gray-100 px-1 font-mono text-xs">{children}</code>
-          ),
-      }}
-    >
-      {content}
-    </Markdown>
-    </div>
-  );
-}
-
-function ToolTrace({ steps }: { steps: AgentToolStep[] }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="mb-2">
-      <button
-        className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
-        onClick={() => setExpanded(!expanded)}
-      >
-        {expanded ? (
-          <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ChevronRight className="h-3 w-3" />
-        )}
-        {steps.length} tool {steps.length === 1 ? 'call' : 'calls'}
-      </button>
-      {expanded && (
-        <div className="mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
-          {steps.map((step, i) => (
-            <ToolStepItem key={i} step={step} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ToolStepItem({ step }: { step: AgentToolStep }) {
-  const [showResult, setShowResult] = useState(false);
-
-  const inputSummary = Object.entries(step.input)
-    .map(([k, v]) => `${k}: ${typeof v === 'string' && v.length > 40 ? v.slice(0, 40) + '...' : JSON.stringify(v)}`)
-    .join(', ');
-
-  return (
-    <div className="text-xs">
-      <div className="flex items-center gap-1 text-gray-500">
-        <span className="font-medium text-gray-700">{step.tool}</span>
-        {inputSummary && (
-          <span className="truncate text-gray-400">({inputSummary})</span>
-        )}
-        {step.duration_ms !== undefined && (
-          <span className="text-gray-300">{step.duration_ms}ms</span>
-        )}
-        {step.result === undefined && (
-          <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
-        )}
-      </div>
-      {step.result !== undefined && (
-        <button
-          className="text-gray-400 hover:text-gray-600"
-          onClick={() => setShowResult(!showResult)}
-        >
-          {showResult ? 'hide result' : 'show result'}
-        </button>
-      )}
-      {showResult && step.result && (
-        <pre className="mt-1 max-h-32 overflow-auto rounded bg-gray-50 p-2 text-xs text-gray-600">
-          {formatToolResult(step.result)}
-        </pre>
-      )}
-    </div>
-  );
-}
-
-function formatToolResult(result: string): string {
-  try {
-    return JSON.stringify(JSON.parse(result), null, 2);
-  } catch {
-    return result;
-  }
 }

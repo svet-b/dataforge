@@ -357,6 +357,22 @@ async def source_raw_response(
     )
 
 
+def _load_run_data(run: RunHistory) -> list[dict[str, Any]]:
+    """Load full result data from CAS, falling back to output_preview."""
+    if run.result_hash:
+        cas_file = cas.get_file_path(settings.data_dir, run.result_hash)
+        if cas_file is not None:
+            rows: list[dict[str, Any]] = []
+            for line in cas_file.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    rows.append(json.loads(line))
+            return rows
+    # Fallback for older runs that only have output_preview
+    if run.output_preview:
+        return run.output_preview.get("data", [])
+    return []
+
+
 @router.get("/{workflow_id}/runs/{run_id}/download")
 def download_run(
     workflow_id: str,
@@ -370,10 +386,10 @@ def download_run(
     run = db.get(RunHistory, run_id)
     if not run or run.workflow_id != workflow_id:
         raise HTTPException(status_code=404, detail="Run not found")
-    if run.status != "success" or not run.output_preview:
+    if run.status != "success":
         raise HTTPException(status_code=400, detail="Run has no output data")
 
-    data = run.output_preview.get("data", [])
+    data = _load_run_data(run)
     if not data:
         raise HTTPException(status_code=400, detail="Run has no output data")
 
