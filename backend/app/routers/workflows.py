@@ -36,7 +36,7 @@ FILE_TYPE_MAP = {
     ".xls": "excel",
 }
 
-TABLE_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+TABLE_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")  # keep in sync w/ duckdb_manager
 
 
 def _get_workflow_or_404(workflow_id: str, db: Session) -> Workflow:

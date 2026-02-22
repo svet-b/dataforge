@@ -25,6 +25,7 @@ from app.llm.events import (
     tool_result_event,
     usage_event,
 )
+from app.serialization import json_safe
 
 logger = logging.getLogger(__name__)
 
@@ -131,21 +132,6 @@ def _truncate_result(result: str, max_chars: int = MAX_TOOL_RESULT_CHARS) -> str
     return trimmed + note
 
 
-def _json_safe(obj: Any) -> Any:
-    """Convert non-JSON-serializable values for tool results."""
-    if isinstance(obj, dict):
-        return {k: _json_safe(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_json_safe(v) for v in obj]
-    if hasattr(obj, "isoformat"):
-        return obj.isoformat()
-    try:
-        json.dumps(obj)
-        return obj
-    except (TypeError, ValueError):
-        return str(obj)
-
-
 def _execute_tool(ctx: AgentContext, tool_name: str, tool_input: dict[str, Any]) -> str:
     """Execute a tool and return the result as a string."""
     if tool_name == "sample_data":
@@ -155,7 +141,7 @@ def _execute_tool(ctx: AgentContext, tool_name: str, tool_input: dict[str, Any])
             data = ctx.session.get_table_data(table_name, limit=limit)
             row_count = ctx.session.get_row_count(table_name)
             return json.dumps(
-                {"rows": _json_safe(data), "total_rows": row_count},
+                {"rows": json_safe(data), "total_rows": row_count},
                 indent=2,
             )
         except duckdb.Error as e:
@@ -170,7 +156,7 @@ def _execute_tool(ctx: AgentContext, tool_name: str, tool_input: dict[str, Any])
             rows = result.fetchall()
             data = [dict(zip(columns, row)) for row in rows[:MAX_RESULT_ROWS]]
             truncated = len(rows) > MAX_RESULT_ROWS
-            out: dict[str, Any] = {"rows": _json_safe(data), "column_count": len(columns)}
+            out: dict[str, Any] = {"rows": json_safe(data), "column_count": len(columns)}
             if truncated:
                 out["note"] = f"Results truncated to {MAX_RESULT_ROWS} rows."
             return json.dumps(out, indent=2)
@@ -261,15 +247,14 @@ async def run_agent(
         tool_results: list[ToolResultBlockParam] = []
         for tool_use in tool_uses:
             tool_name = tool_use.name
-            tool_input = tool_use.input
-            assert isinstance(tool_input, dict)
+            tool_input = tool_use.input  # type: ignore[assignment]
+            if not isinstance(tool_input, dict):
+                continue
 
             # Check for terminal submit_sql
             if tool_name == "submit_sql":
-                sql = tool_input.get("sql", "")
-                explanation = tool_input.get("explanation", "")
-                assert isinstance(sql, str)
-                assert isinstance(explanation, str)
+                sql = str(tool_input.get("sql", ""))
+                explanation = str(tool_input.get("explanation", ""))
                 yield result_event(sql, explanation)
                 return
 
@@ -279,7 +264,7 @@ async def run_agent(
             start = time.monotonic()
             try:
                 result_str = await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(
+                    asyncio.get_running_loop().run_in_executor(
                         None, partial(_execute_tool, ctx, tool_name, tool_input)
                     ),
                     timeout=SQL_TIMEOUT_SECONDS,

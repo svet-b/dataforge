@@ -1,4 +1,5 @@
 import { Database, ShieldCheck, FlaskConical, Play } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export type Screen = 'source' | 'validate' | 'analyze' | 'execute';
 
@@ -20,24 +21,29 @@ export default function ScreenSidebar({ activeScreen, onScreenChange }: ScreenSi
       {screens.map(({ id, label, icon: Icon, disabled }) => {
         const isActive = activeScreen === id;
         return (
-          <button
-            key={id}
-            title={disabled ? `${label} (coming soon)` : label}
-            disabled={disabled}
-            className={`relative mb-1 flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
-              disabled
-                ? 'cursor-not-allowed text-gray-600'
-                : isActive
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-            }`}
-            onClick={() => !disabled && onScreenChange(id)}
-          >
-            {isActive && (
-              <div className="absolute left-0 top-1.5 h-5 w-0.5 rounded-r bg-blue-400" />
-            )}
-            <Icon className="h-5 w-5" />
-          </button>
+          <Tooltip key={id}>
+            <TooltipTrigger asChild>
+              <button
+                disabled={disabled}
+                className={`relative mb-1 flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
+                  disabled
+                    ? 'cursor-not-allowed text-gray-600'
+                    : isActive
+                      ? 'bg-gray-700 text-white'
+                      : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                }`}
+                onClick={() => !disabled && onScreenChange(id)}
+              >
+                {isActive && (
+                  <div className="absolute left-0 top-1.5 h-5 w-0.5 rounded-r bg-blue-400" />
+                )}
+                <Icon className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {disabled ? `${label} (coming soon)` : label}
+            </TooltipContent>
+          </Tooltip>
         );
       })}
     </div>

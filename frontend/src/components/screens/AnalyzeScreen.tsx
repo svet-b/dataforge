@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useResultsStore } from '@/stores/results';
 import { useCteInspectionStore } from '@/stores/cteInspection';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import LlmChat from '@/components/LlmChat';
 import QueryEditor from '@/components/QueryEditor';
-import DataTable from '@/components/DataTable';
+import ResultsTabContent from '@/components/ResultsTabContent';
+import CtesTabContent from '@/components/CtesTabContent';
 import ResultsChart from '@/components/ResultsChart';
-import { Loader2 } from 'lucide-react';
 
 interface AnalyzeScreenProps {
   workflowId: string;
@@ -137,34 +138,18 @@ export default function AnalyzeScreen({ workflowId, onRun }: AnalyzeScreenProps)
       {/* Right column: Data tables + Chart */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top-right: Results / CTEs data table */}
-        <div
+        <Tabs
+          value={dataTab}
+          onValueChange={(v) => handleDataTabChange(v as DataTab)}
           className="flex flex-col overflow-hidden bg-white"
           style={{ height: `${vSplitRight}%` }}
         >
-          {/* Tab bar */}
-          <div className="flex shrink-0 items-center border-b border-gray-200 bg-white">
-            <button
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                dataTab === 'results'
-                  ? 'border-b-2 border-blue-500 text-blue-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => handleDataTabChange('results')}
-            >
-              Results
-            </button>
-            <button
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                dataTab === 'ctes'
-                  ? 'border-b-2 border-blue-500 text-blue-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => handleDataTabChange('ctes')}
-            >
-              Intermediate CTEs
-            </button>
+          <div className="flex shrink-0 items-center bg-white">
+            <TabsList>
+              <TabsTrigger value="results">Results</TabsTrigger>
+              <TabsTrigger value="ctes">Intermediate CTEs</TabsTrigger>
+            </TabsList>
 
-            {/* Results metadata */}
             {dataTab === 'results' && results.data.length > 0 && (
               <span className="ml-auto pr-3 text-xs text-gray-400">
                 {results.data.length} of {results.rowCount ?? results.data.length} rows
@@ -176,15 +161,13 @@ export default function AnalyzeScreen({ workflowId, onRun }: AnalyzeScreenProps)
             )}
           </div>
 
-          {/* Tab content */}
-          <div className="min-h-0 flex-1 overflow-auto">
-            {dataTab === 'results' ? (
-              <ResultsTabContent />
-            ) : (
-              <CtesTabContent workflowId={workflowId} />
-            )}
-          </div>
-        </div>
+          <TabsContent value="results" className="min-h-0 overflow-auto">
+            <ResultsTabContent />
+          </TabsContent>
+          <TabsContent value="ctes" className="min-h-0 overflow-auto">
+            <CtesTabContent workflowId={workflowId} />
+          </TabsContent>
+        </Tabs>
 
         {/* Right vertical divider */}
         <div
@@ -208,90 +191,6 @@ export default function AnalyzeScreen({ workflowId, onRun }: AnalyzeScreenProps)
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function ResultsTabContent() {
-  const results = useResultsStore();
-
-  if (results.loading) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-gray-500">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        Running query...
-      </div>
-    );
-  }
-
-  if (results.error) {
-    return <div className="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{results.error}</div>;
-  }
-
-  if (results.data.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-gray-400">
-        No results yet. Click Run to execute the workflow.
-      </div>
-    );
-  }
-
-  return <DataTable data={results.data} schema={results.schema} />;
-}
-
-function CtesTabContent({ workflowId }: { workflowId: string }) {
-  const cteState = useCteInspectionStore();
-
-  const selectedCteData = useMemo(
-    () => cteState.ctes.find((c) => c.name === cteState.selectedCte) ?? null,
-    [cteState.ctes, cteState.selectedCte],
-  );
-
-  if (cteState.loading) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-gray-500">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        Inspecting CTEs...
-      </div>
-    );
-  }
-
-  if (cteState.error) {
-    return <div className="m-3 rounded bg-red-50 p-3 text-sm text-red-600">{cteState.error}</div>;
-  }
-
-  if (cteState.ctes.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-gray-400">
-        No CTEs found in the query.
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-full flex-col">
-      {/* CTE pills */}
-      <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-gray-200 bg-white px-3 py-1.5">
-        {cteState.ctes.map((cte) => (
-          <button
-            key={cte.name}
-            className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-              cteState.selectedCte === cte.name
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            onClick={() => cteState.selectCte(cte.name)}
-          >
-            {cte.name}
-            <span className="ml-1 text-gray-400">{cte.row_count}</span>
-          </button>
-        ))}
-      </div>
-      {selectedCteData && (
-        <div className="min-h-0 flex-1">
-          <DataTable data={selectedCteData.data} schema={selectedCteData.schema_info} />
-        </div>
-      )}
     </div>
   );
 }

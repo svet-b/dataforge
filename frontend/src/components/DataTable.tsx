@@ -9,18 +9,13 @@ import {
   type ColumnSizingState,
 } from '@tanstack/react-table';
 import type { SchemaColumn } from '@/types';
+import { isNumericColumn } from '@/utils/columnTypes';
 
 type RowData = Record<string, unknown>;
 
 interface DataTableProps {
   data: RowData[];
   schema: SchemaColumn[];
-}
-
-const NUMERIC_TYPE_RE = /^(INTEGER|BIGINT|SMALLINT|TINYINT|HUGEINT|FLOAT|DOUBLE|DECIMAL|NUMERIC|REAL|INT|UBIGINT|UINTEGER|USMALLINT|UTINYINT)/i;
-
-function isNumericColumn(type: string): boolean {
-  return NUMERIC_TYPE_RE.test(type);
 }
 
 const MAX_SIG_FIGS = 10;

@@ -13,7 +13,3 @@ class SourceConnector(Protocol):
     ) -> Path:
         """Fetch data, return path to a temp file for DuckDB ingestion."""
         ...
-
-    def duckdb_load_method(self) -> str:
-        """Return 'json', 'csv', or 'parquet'."""
-        ...

@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SourceResponse, SchemaColumn, SourceRawResponse } from '@/types';
+import type { SourceResponse, SchemaColumn } from '@/types';
 import { useWorkflowStore } from '@/stores/workflow';
 import { api } from '@/api/client';
-import { addToast } from '@/stores/toasts';
 import { debounce } from '@/utils/debounce';
 import { deriveTableName, tableNameFromUrl } from '@/utils/tableName';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronRight, Loader2, Play } from 'lucide-react';
-import KeyValueEditor from './KeyValueEditor';
-import JsonTree from './JsonTree';
+import { Label } from '@/components/ui/label';
+import FileSourceConfig from './FileSourceConfig';
+import ApiSourceConfig from './ApiSourceConfig';
 
 
 
@@ -27,8 +25,6 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
   const [fileType, setFileType] = useState((source.config.file_type as string) ?? '');
   const [delimiter, setDelimiter] = useState((source.config.delimiter as string) ?? ',');
   const [hasHeader, setHasHeader] = useState((source.config.has_header as boolean) ?? true);
-  const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
 
   // ── API source state ──
   const [url, setUrl] = useState((source.config.url as string) ?? '');
@@ -40,12 +36,6 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
   );
   const [body, setBody] = useState((source.config.body as string) ?? '');
   const [responsePath, setResponsePath] = useState((source.config.response_path as string) ?? '');
-
-  // ── Raw preview state ──
-  const [rawData, setRawData] = useState<SourceRawResponse | null>(null);
-  const [rawLoading, setRawLoading] = useState(false);
-  const [rawError, setRawError] = useState<string | null>(null);
-  const [rawExpanded, setRawExpanded] = useState(false);
 
   // ── Common ──
   const [tableName, setTableName] = useState(source.table_name);
@@ -101,29 +91,6 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
     }
   }, [workflowId, source.id]);
 
-  const fetchRawPreview = useCallback(async () => {
-    setRawLoading(true);
-    setRawError(null);
-    setRawData(null);
-    setRawExpanded(true);
-    try {
-      const result = await api.sources.fetchRaw(workflowId, source.id);
-      setRawData(result);
-    } catch (e) {
-      setRawError(e instanceof Error ? e.message : 'Failed to fetch response');
-    } finally {
-      setRawLoading(false);
-    }
-  }, [workflowId, source.id]);
-
-  // Clear raw preview when switching sources or when the saved URL changes
-  useEffect(() => {
-    setRawData(null);
-    setRawError(null);
-    setRawLoading(false);
-    setRawExpanded(false);
-  }, [source.id, source.config.url]);
-
   // Auto-fetch schema when source is configured or response_path changes
   useEffect(() => {
     if (sourceConfigured) {
@@ -167,15 +134,6 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
     [workflowId, source.id, source.type, updateSource],
   );
 
-  const handleSelectPath = useCallback(
-    (path: string) => {
-      setResponsePath(path);
-      saveConfig();
-      // Schema auto-reloads via useEffect when source.config.response_path changes after save
-    },
-    [saveConfig],
-  );
-
   function onFieldChange() {
     saveConfig();
   }
@@ -197,44 +155,12 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
     saveConfig();
   }
 
-  async function handleFile(file: File) {
-    setUploading(true);
-    try {
-      const result = await api.files.upload(workflowId, file);
-      setFilename(result.filename);
-      setFileType(result.file_type);
-
-      if (!tableNameManuallyEdited) {
-        setTableName(deriveTableName(result.filename, otherTableNames));
-      }
-
-      saveConfig.cancel();
-      saveConfig();
-      setTimeout(() => fetchSchema(), 600);
-      addToast(`Uploaded ${result.filename}`, 'success');
-    } catch (e) {
-      addToast(`Upload failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function onFileInput(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.files?.[0]) handleFile(e.target.files[0]);
-  }
-
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer?.files?.[0]) handleFile(e.dataTransfer.files[0]);
-  }
-
   return (
     <div className="border-t border-gray-200 bg-gray-50/50" data-testid="source-config">
       <div className="space-y-3 p-3">
         {/* Table name */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Table Name</label>
+          <Label className="mb-1 block text-xs text-gray-600">Table Name</Label>
           <Input
             className="text-sm"
             value={tableName}
@@ -244,172 +170,44 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
         </div>
 
         {source.type === 'file' ? (
-          <>
-            {/* File upload */}
-            <div
-              className={`relative rounded-lg border-2 border-dashed p-3 text-center transition-colors ${
-                dragOver ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-gray-400'
-              }`}
-              onDrop={onDrop}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-            >
-              {uploading ? (
-                <p className="text-sm text-gray-500">Uploading...</p>
-              ) : filename ? (
-                <>
-                  <p className="text-sm font-medium text-gray-700">{filename}</p>
-                  <p className="text-xs text-gray-400">Drop a new file to replace</p>
-                </>
-              ) : (
-                <p className="text-sm text-gray-500">Drop a file here or click to browse</p>
-              )}
-              <input
-                type="file"
-                className="absolute inset-0 cursor-pointer opacity-0"
-                onChange={onFileInput}
-                accept=".csv,.tsv,.json,.xlsx,.xls,.parquet"
-              />
-            </div>
-
-            {fileType === 'csv' && (
-              <div className="flex gap-3">
-                <div className="w-20">
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Delimiter</label>
-                  <Input
-                    className="text-sm"
-                    value={delimiter}
-                    onChange={(e) => { setDelimiter(e.target.value); onFieldChange(); }}
-                  />
-                </div>
-                <div className="flex items-end gap-1.5 pb-0.5">
-                  <input
-                    type="checkbox"
-                    id={`header-${source.id}`}
-                    checked={hasHeader}
-                    onChange={(e) => { setHasHeader(e.target.checked); onFieldChange(); }}
-                  />
-                  <label htmlFor={`header-${source.id}`} className="text-xs text-gray-600">Header row</label>
-                </div>
-              </div>
-            )}
-          </>
+          <FileSourceConfig
+            workflowId={workflowId}
+            sourceId={source.id}
+            filename={filename}
+            fileType={fileType}
+            delimiter={delimiter}
+            hasHeader={hasHeader}
+            otherTableNames={otherTableNames}
+            tableNameManuallyEdited={tableNameManuallyEdited}
+            onFilenameChange={setFilename}
+            onFileTypeChange={setFileType}
+            onDelimiterChange={setDelimiter}
+            onHasHeaderChange={setHasHeader}
+            onTableNameDerived={setTableName}
+            onFieldChange={onFieldChange}
+            onUploadComplete={() => {
+              saveConfig.cancel();
+              saveConfig();
+              setTimeout(() => fetchSchema(), 600);
+            }}
+          />
         ) : (
-          <>
-            {/* API source */}
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <label className="block text-xs font-medium text-gray-600">URL</label>
-                {url && (
-                  <button
-                    className="flex items-center gap-1 text-xs text-blue-600 underline hover:text-blue-800 disabled:opacity-50"
-                    onClick={fetchRawPreview}
-                    disabled={rawLoading}
-                  >
-                    {rawLoading ? (
-                      <>
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Running...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-3 w-3" />
-                        Run Request
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-              <Input
-                className="text-sm"
-                value={url}
-                onChange={(e) => onUrlInput(e.target.value)}
-                placeholder="https://api.example.com/data"
-              />
-            </div>
-
-            <div className="w-28">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Method</label>
-              <select
-                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
-                value={method}
-                onChange={(e) => { setMethod(e.target.value); onFieldChange(); }}
-              >
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Headers</label>
-              <KeyValueEditor
-                entries={headers}
-                onChange={(newHeaders) => { setHeaders(newHeaders); onFieldChange(); }}
-                keyPlaceholder="Header name"
-                valuePlaceholder="Header value"
-              />
-            </div>
-
-            {method === 'POST' && (
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Body</label>
-                <Textarea
-                  className="font-mono text-sm"
-                  rows={3}
-                  value={body}
-                  onChange={(e) => { setBody(e.target.value); onFieldChange(); }}
-                  placeholder='{"key": "value"}'
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Response Path</label>
-              <Input
-                className="text-sm"
-                value={responsePath}
-                onChange={(e) => { setResponsePath(e.target.value); onFieldChange(); }}
-                placeholder="data.results"
-              />
-            </div>
-          </>
-        )}
-
-        {/* Raw response preview (API sources) */}
-        {source.type === 'api' && (rawData || rawError) && (
-          <div className="pt-1">
-            <button
-              className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-800"
-              onClick={() => setRawExpanded(!rawExpanded)}
-            >
-              {rawExpanded ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-              Raw Response
-              {rawData && (
-                <span className="ml-1 font-normal text-gray-400">(click arrays to set path)</span>
-              )}
-            </button>
-            {rawExpanded && (
-              <div className="mt-1 space-y-2">
-                {rawError ? (
-                  <p className="text-xs text-red-600">{rawError}</p>
-                ) : rawData ? (
-                  <>
-                    <div className="max-h-64 overflow-y-auto rounded border border-gray-200 bg-white p-2">
-                      <JsonTree
-                        data={rawData.raw_data}
-                        selectedPath={responsePath || undefined}
-                        onSelectPath={handleSelectPath}
-                      />
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            )}
-          </div>
+          <ApiSourceConfig
+            workflowId={workflowId}
+            sourceId={source.id}
+            url={url}
+            method={method}
+            headers={headers}
+            body={body}
+            responsePath={responsePath}
+            savedUrl={source.config.url as string | undefined}
+            onUrlChange={onUrlInput}
+            onMethodChange={setMethod}
+            onHeadersChange={setHeaders}
+            onBodyChange={setBody}
+            onResponsePathChange={setResponsePath}
+            onFieldChange={onFieldChange}
+          />
         )}
 
         {/* Schema display */}
@@ -424,7 +222,7 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
         ) : schemaColumns.length > 0 ? (
           <div className="pt-1">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-600">Schema</span>
+              <Label className="text-xs text-gray-600">Schema</Label>
               {schemaRowCount !== null && (
                 <span className="text-xs text-gray-400">{schemaRowCount.toLocaleString()} rows</span>
               )}

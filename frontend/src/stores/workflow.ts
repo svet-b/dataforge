@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import { api, ApiError } from '@/api/client';
+import { api } from '@/api/client';
 import type {
   WorkflowDetail,
   WorkflowParameter,
   SourceResponse,
   SourceType,
 } from '@/types';
+import { errorMsg } from '@/utils/errorMsg';
 import { addToast } from './toasts';
 import { useSourcePreviewStore } from './sourcePreview';
 
@@ -14,12 +15,6 @@ interface WorkflowState {
   loading: boolean;
   error: string | null;
   selectedSourceId: string | null;
-}
-
-function errorMsg(e: unknown): string {
-  if (e instanceof ApiError) return e.detail;
-  if (e instanceof Error) return e.message;
-  return String(e);
 }
 
 interface WorkflowActions {

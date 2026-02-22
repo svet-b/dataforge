@@ -3,8 +3,10 @@ from __future__ import annotations
 import csv
 import io
 import json
-from datetime import UTC, date, datetime
-from decimal import Decimal
+import os
+import time
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,11 +14,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.connectors.api_connector import APIConnector
 from app.database import get_db
+from app.engine.duckdb_manager import DuckDBSession
 from app.engine.executor import WorkflowExecutor
 from app.ids import generate_cuid
 from app.models.run import RunHistory
-from app.models.source import Source
 from app.models.uploaded_file import UploadedFile
 from app.models.workflow import Workflow
 from app.schemas.execution import (
@@ -29,22 +32,10 @@ from app.schemas.execution import (
     ValidateQueryRequest,
     ValidateQueryResponse,
 )
+from app.serialization import json_safe
 from app.services import cas
 
 router = APIRouter(prefix="/api/workflows", tags=["execution"])
-
-
-def _json_safe(obj: Any) -> Any:
-    """Recursively convert non-JSON-serializable values to strings."""
-    if isinstance(obj, dict):
-        return {k: _json_safe(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_json_safe(v) for v in obj]
-    if isinstance(obj, (datetime, date)):
-        return obj.isoformat()
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
 
 
 def _load_workflow(
@@ -105,9 +96,9 @@ async def run_workflow(
         raise HTTPException(status_code=400, detail="Workflow has no query defined")
     parameters = _merge_parameters(workflow, body.parameters)
 
+    started_at = datetime.now(UTC).isoformat()
     executor = WorkflowExecutor(settings)
     exec_result = await executor.execute(
-        workflow_id=workflow_id,
         sources=sources,
         query=query,
         parameters=parameters,
@@ -139,23 +130,24 @@ async def run_workflow(
             db, cas.canonicalize_json(exec_result.source_file_hashes), "source_data"
         )
         # Store result NDJSON in CAS (file-based, no FK)
-        result_hash = cas.store_bytes(settings.data_dir, exec_result.ndjson_result)
+        if exec_result.ndjson_result_path is not None:
+            result_hash = cas.store_file(settings.data_dir, exec_result.ndjson_result_path)
 
     # Store run in run_history (keep up to 10k rows for downloads)
     run_id = generate_cuid()
-    now = datetime.now(UTC).isoformat()
+    completed_at = datetime.now(UTC).isoformat()
     run = RunHistory(
         id=run_id,
         workflow_id=workflow_id,
         parameters=parameters,
         status=exec_result.status,
-        started_at=now,
-        completed_at=now,
+        started_at=started_at,
+        completed_at=completed_at,
         duration_ms=exec_result.duration_ms,
         row_count=exec_result.row_count,
         schema_info=schema_info,
         output_preview=(
-            _json_safe({"data": exec_result.data[:10_000]}) if exec_result.data else None
+            json_safe({"data": exec_result.data[:10_000]}) if exec_result.data else None
         ),
         error=exec_result.error,
         query_hash=query_hash,
@@ -180,20 +172,27 @@ async def run_workflow(
         db.commit()
 
     # Return data capped at 100 rows for the UI
-    return RunResponse(
-        run_id=run_id,
-        status=exec_result.status,
-        duration_ms=exec_result.duration_ms,
-        row_count=exec_result.row_count,
-        data=_json_safe(exec_result.data[:100]) if exec_result.data else None,
-        schema_info=schema_info,
-        error=exec_result.error,
-        query_hash=query_hash,
-        source_config_hash=source_config_hash,
-        parameters_hash=parameters_hash,
-        source_data_hash=source_data_hash,
-        result_hash=result_hash,
-    )
+    try:
+        return RunResponse(
+            run_id=run_id,
+            status=exec_result.status,
+            duration_ms=exec_result.duration_ms,
+            row_count=exec_result.row_count,
+            data=json_safe(exec_result.data[:100]) if exec_result.data else None,
+            schema_info=schema_info,
+            error=exec_result.error,
+            query_hash=query_hash,
+            source_config_hash=source_config_hash,
+            parameters_hash=parameters_hash,
+            source_data_hash=source_data_hash,
+            result_hash=result_hash,
+        )
+    finally:
+        if exec_result.ndjson_result_path is not None:
+            try:
+                os.unlink(exec_result.ndjson_result_path)
+            except OSError:
+                pass
 
 
 @router.post("/{workflow_id}/inspect-ctes")
@@ -210,7 +209,6 @@ async def inspect_ctes(
 
     executor = WorkflowExecutor(settings)
     result = await executor.inspect_ctes(
-        workflow_id=workflow_id,
         sources=sources,
         query=query,
         parameters=parameters,
@@ -224,7 +222,7 @@ async def inspect_ctes(
                 "name": c.name,
                 "ordinal": c.ordinal,
                 "row_count": c.row_count,
-                "data": _json_safe(c.data),
+                "data": json_safe(c.data),
                 "schema_info": c.schema_info,
             }
             for c in result.ctes
@@ -243,16 +241,15 @@ async def validate_query(
     workflow, sources, _query = _load_workflow(workflow_id, db)
     parameters = _merge_parameters(workflow, {})
 
-    from app.engine.duckdb_manager import DuckDBSession
-
     executor = WorkflowExecutor(settings)
     session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
+    temp_files: list[Path] = []
     try:
         for name, value in parameters.items():
             session.set_variable(name, str(value))
 
         for source in sources:
-            await executor._load_source(session, source, parameters)
+            await executor.load_source(session, source, parameters, temp_files)
 
         error = session.validate_query(body.query)
         if error is None:
@@ -262,6 +259,7 @@ async def validate_query(
         return ValidateQueryResponse(valid=False, error=str(e))
     finally:
         session.close()
+        executor._cleanup_temp_files(temp_files)
 
 
 @router.post("/{workflow_id}/preview-sources")
@@ -274,19 +272,16 @@ async def preview_sources(
     if not sources:
         return SourcePreviewResponse(status="success", duration_ms=0, sources=[])
 
-    import time
-
-    from app.engine.duckdb_manager import DuckDBSession
-
     start_time = time.monotonic()
     executor = WorkflowExecutor(settings)
     session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
+    temp_files: list[Path] = []
     results: list[dict[str, Any]] = []
     try:
         for source in sources:
             table_name = source["table_name"]
             try:
-                await executor._load_source(session, source, {})
+                await executor.load_source(session, source, {}, temp_files)
                 schema = session.get_table_schema(table_name)
                 row_count = session.get_row_count(table_name)
                 data = session.get_table_data(table_name, limit=100)
@@ -294,7 +289,7 @@ async def preview_sources(
                     {
                         "name": table_name,
                         "row_count": row_count,
-                        "data": _json_safe(data),
+                        "data": json_safe(data),
                         "schema_info": schema,
                     }
                 )
@@ -310,6 +305,7 @@ async def preview_sources(
                 )
     finally:
         session.close()
+        executor._cleanup_temp_files(temp_files)
 
     return SourcePreviewResponse(
         status="success",
@@ -325,42 +321,24 @@ async def source_schema(
     db: Session = Depends(get_db),
 ) -> SourceSchemaResponse:
     """Load a single source into DuckDB and return its schema and row count."""
-    workflow = db.get(Workflow, workflow_id)
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+    _workflow, sources, _query = _load_workflow(workflow_id, db)
 
-    source_model = db.get(Source, source_id)
-    if not source_model or source_model.workflow_id != workflow_id:
+    source_dict = next((s for s in sources if s["id"] == source_id), None)
+    if source_dict is None:
         raise HTTPException(status_code=404, detail="Source not found")
-
-    # Resolve file path if needed
-    uploaded_files = db.query(UploadedFile).filter(UploadedFile.workflow_id == workflow_id).all()
-    file_path_map = {uf.filename: uf.storage_path for uf in uploaded_files}
-    config = dict(source_model.config)
-    if source_model.type == "file" and "filename" in config and "file_path" not in config:
-        filename = config["filename"]
-        if filename in file_path_map:
-            config["file_path"] = file_path_map[filename]
-
-    source_dict = {
-        "id": source_model.id,
-        "type": source_model.type,
-        "table_name": source_model.table_name,
-        "config": config,
-    }
-
-    from app.engine.duckdb_manager import DuckDBSession
 
     executor = WorkflowExecutor(settings)
     session = DuckDBSession(memory_limit_mb=settings.execution_max_memory_mb)
+    temp_files: list[Path] = []
     try:
-        await executor._load_source(session, source_dict, {})
-        columns = session.get_table_schema(source_model.table_name)
-        row_count = session.get_row_count(source_model.table_name)
+        await executor.load_source(session, source_dict, {}, temp_files)
+        columns = session.get_table_schema(source_dict["table_name"])
+        row_count = session.get_row_count(source_dict["table_name"])
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     finally:
         session.close()
+        executor._cleanup_temp_files(temp_files)
 
     return SourceSchemaResponse(columns=columns, row_count=row_count)
 
@@ -372,21 +350,16 @@ async def source_raw_response(
     db: Session = Depends(get_db),
 ) -> SourceRawResponse:
     """Fetch raw JSON response from an API source for preview and path selection."""
-    workflow = db.get(Workflow, workflow_id)
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+    _workflow, sources, _query = _load_workflow(workflow_id, db)
 
-    source_model = db.get(Source, source_id)
-    if not source_model or source_model.workflow_id != workflow_id:
+    source_dict = next((s for s in sources if s["id"] == source_id), None)
+    if source_dict is None:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    if source_model.type != "api":
+    if source_dict["type"] != "api":
         raise HTTPException(status_code=400, detail="Source is not an API source")
 
-    config = dict(source_model.config)
-
-    from app.connectors.api_connector import APIConnector
-
+    config = source_dict["config"]
     connector = APIConnector()
     try:
         raw_data, extracted = await connector.fetch_raw(config, {}, {})
@@ -394,10 +367,66 @@ async def source_raw_response(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     return SourceRawResponse(
-        raw_data=_json_safe(raw_data),
-        extracted_records=_json_safe(extracted[:50]),
+        raw_data=json_safe(raw_data),
+        extracted_records=json_safe(extracted[:50]),
         extracted_count=len(extracted),
     )
+
+
+def _load_preview_data(run: RunHistory) -> list[dict[str, Any]]:
+    """Fallback for older runs that only have output_preview."""
+    if run.output_preview:
+        return run.output_preview.get("data", [])
+    return []
+
+
+def _stream_json_array(cas_file: Path):
+    """Stream NDJSON from CAS as a JSON array without full materialization."""
+    def _iter():
+        yield b"[\n"
+        first = True
+        with cas_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                if not first:
+                    yield b",\n"
+                yield line.encode("utf-8")
+                first = False
+        yield b"\n]\n"
+    return _iter()
+
+
+def _stream_csv(cas_file: Path):
+    """Stream NDJSON from CAS as CSV without loading all rows."""
+    def _iter():
+        writer_out = io.StringIO()
+        writer: csv.DictWriter | None = None
+        with cas_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                row = json.loads(line)
+                if writer is None:
+                    writer = csv.DictWriter(writer_out, fieldnames=list(row.keys()))
+                    writer.writeheader()
+                    yield writer_out.getvalue().encode("utf-8")
+                    writer_out.seek(0)
+                    writer_out.truncate(0)
+                writer.writerow(row)
+                yield writer_out.getvalue().encode("utf-8")
+                writer_out.seek(0)
+                writer_out.truncate(0)
+    return _iter()
+
+
+def _load_run_data(run: RunHistory) -> list[dict[str, Any]]:
+    """Load full result data for legacy runs without CAS-backed output."""
+    if run.result_hash:
+        return []
+    return _load_preview_data(run)
 
 
 @router.get("/{workflow_id}/runs/{run_id}/download")
@@ -413,10 +442,23 @@ def download_run(
     run = db.get(RunHistory, run_id)
     if not run or run.workflow_id != workflow_id:
         raise HTTPException(status_code=404, detail="Run not found")
-    if run.status != "success" or not run.output_preview:
+    if run.status != "success":
         raise HTTPException(status_code=400, detail="Run has no output data")
 
-    data = run.output_preview.get("data", [])
+    if run.result_hash:
+        cas_file = cas.get_file_path(settings.data_dir, run.result_hash)
+        if cas_file is None:
+            raise HTTPException(status_code=404, detail="Result data not found in CAS")
+        stream = _stream_json_array(cas_file) if format == "json" else _stream_csv(cas_file)
+        media_type = "application/json" if format == "json" else "text/csv"
+        filename = f"run_{run_id}.json" if format == "json" else f"run_{run_id}.csv"
+        return StreamingResponse(
+            stream,
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    data = _load_preview_data(run)
     if not data:
         raise HTTPException(status_code=400, detail="Run has no output data")
 
@@ -427,13 +469,13 @@ def download_run(
             media_type="application/json",
             headers={"Content-Disposition": f"attachment; filename=run_{run_id}.json"},
         )
-    else:
-        output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=list(data[0].keys()))
-        writer.writeheader()
-        writer.writerows(data)
-        return StreamingResponse(
-            io.BytesIO(output.getvalue().encode()),
-            media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=run_{run_id}.csv"},
-        )
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=list(data[0].keys()))
+    writer.writeheader()
+    writer.writerows(data)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=run_{run_id}.csv"},
+    )

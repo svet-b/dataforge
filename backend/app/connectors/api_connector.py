@@ -12,6 +12,25 @@ import httpx
 class APIConnector:
     """Fetches data from REST APIs."""
 
+    def _resolve_headers(
+        self,
+        config: dict[str, Any],
+        parameters: dict[str, Any],
+        env: dict[str, str],
+    ) -> dict[str, str]:
+        """Normalize and interpolate request headers from config."""
+        raw_headers = config.get("headers", {})
+        # Accept headers as either a dict or a list of {key, value} objects
+        if isinstance(raw_headers, list):
+            headers_dict: dict[str, str] = {
+                h["key"]: h["value"] for h in raw_headers if h.get("key")
+            }
+        else:
+            headers_dict = raw_headers
+        return {
+            k: self._interpolate(v, parameters, env) for k, v in headers_dict.items()
+        }
+
     async def fetch(
         self,
         config: dict[str, Any],
@@ -21,17 +40,7 @@ class APIConnector:
         url_template: str = config.get("url_template") or config.get("url") or ""
         url = self._interpolate(url_template, parameters, env)
         method: str = config.get("method", "GET").upper()
-        raw_headers = config.get("headers", {})
-        # Accept headers as either a dict or a list of {key, value} objects
-        if isinstance(raw_headers, list):
-            headers_dict: dict[str, str] = {
-                h["key"]: h["value"] for h in raw_headers if h.get("key")
-            }
-        else:
-            headers_dict = raw_headers
-        headers = {
-            k: self._interpolate(v, parameters, env) for k, v in headers_dict.items()
-        }
+        headers = self._resolve_headers(config, parameters, env)
         body_template = config.get("body_template")
         body: dict[str, Any] | None = None
         if body_template:
@@ -63,9 +72,6 @@ class APIConnector:
             tmp.write(json.dumps(record) + "\n")
         tmp.close()
         return Path(tmp.name)
-
-    def duckdb_load_method(self) -> str:
-        return "json"
 
     def _interpolate(self, template: str, parameters: dict[str, Any], env: dict[str, str]) -> str:
         """Replace {{param_name}} and {{env.VAR_NAME}} in a template string."""
@@ -102,16 +108,7 @@ class APIConnector:
         url_template: str = config.get("url_template") or config.get("url") or ""
         url = self._interpolate(url_template, parameters, env)
         method: str = config.get("method", "GET").upper()
-        raw_headers = config.get("headers", {})
-        if isinstance(raw_headers, list):
-            headers_dict: dict[str, str] = {
-                h["key"]: h["value"] for h in raw_headers if h.get("key")
-            }
-        else:
-            headers_dict = raw_headers
-        headers = {
-            k: self._interpolate(v, parameters, env) for k, v in headers_dict.items()
-        }
+        headers = self._resolve_headers(config, parameters, env)
         async with httpx.AsyncClient() as client:
             if method == "POST":
                 response = await client.post(url, headers=headers)

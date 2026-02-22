@@ -18,9 +18,6 @@ class FileConnector:
             raise FileNotFoundError(f"Source file not found: {file_path}")
         return file_path
 
-    def duckdb_load_method(self) -> str:
-        return "auto"
-
     def get_file_type(self, config: dict[str, Any]) -> str:
         file_type: str = config.get("file_type", "")
         if file_type:

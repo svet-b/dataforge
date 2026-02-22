@@ -29,7 +29,7 @@ async def test_simple_workflow_execution(executor: WorkflowExecutor) -> None:
     query = "SELECT meter_id, SUM(energy_kwh) AS total FROM raw_data GROUP BY meter_id"
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},
@@ -48,7 +48,10 @@ async def test_simple_workflow_execution(executor: WorkflowExecutor) -> None:
     assert len(result.source_file_hashes["raw_data"]) == 64  # SHA-256 hex
     assert "raw_data" in result.source_file_paths
     assert result.source_file_paths["raw_data"].exists()
-    assert len(result.ndjson_result) > 0
+    assert result.ndjson_result_path is not None
+    assert result.ndjson_result_path.exists()
+    assert result.ndjson_result_path.stat().st_size > 0
+    result.ndjson_result_path.unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio
@@ -66,7 +69,7 @@ async def test_workflow_with_parameters(executor: WorkflowExecutor) -> None:
     query = "SELECT * FROM raw_data WHERE meter_id = getvariable('target_meter')"
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={"target_meter": "M-001"},
@@ -93,7 +96,7 @@ async def test_transform_error_handling(executor: WorkflowExecutor) -> None:
     query = "SELECT nonexistent_column FROM raw_data"
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},
@@ -130,7 +133,7 @@ async def test_multiple_sources_with_join(executor: WorkflowExecutor) -> None:
     )
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},
@@ -156,7 +159,7 @@ async def test_preview_with_limit(executor: WorkflowExecutor) -> None:
     query = "SELECT * FROM raw_data"
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},
@@ -194,7 +197,7 @@ async def test_cte_query(executor: WorkflowExecutor) -> None:
     """
 
     result = await executor.execute(
-        workflow_id="test-wf",
+
         sources=sources,
         query=query,
         parameters={},

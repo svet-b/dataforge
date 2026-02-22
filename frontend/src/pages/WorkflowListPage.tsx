@@ -5,6 +5,7 @@ import { addToast } from '@/stores/toasts';
 import type { WorkflowSummary } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -139,7 +140,7 @@ export default function WorkflowListPage() {
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <label htmlFor="workflow-name" className="mb-1 block text-xs font-medium text-gray-600">Name</label>
+              <Label htmlFor="workflow-name" className="mb-1 block text-xs text-gray-600">Name</Label>
               <Input
                 id="workflow-name"
                 ref={nameInputRef}
@@ -150,7 +151,7 @@ export default function WorkflowListPage() {
               />
             </div>
             <div>
-              <label htmlFor="workflow-desc" className="mb-1 block text-xs font-medium text-gray-600">Description (optional)</label>
+              <Label htmlFor="workflow-desc" className="mb-1 block text-xs text-gray-600">Description (optional)</Label>
               <Textarea
                 id="workflow-desc"
                 value={newDescription}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useSourcePreviewStore } from '@/stores/sourcePreview';
+import { Badge } from '@/components/ui/badge';
 import DataViewer from './DataViewer';
 import { Loader2 } from 'lucide-react';
 
@@ -46,18 +47,15 @@ export default function SourcePreview({ workflowId }: SourcePreviewProps) {
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-gray-200 bg-white px-3 py-1.5">
         {state.sources.map((src) => (
-          <button
+          <Badge
             key={src.name}
-            className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-              state.selectedSource === src.name
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            variant={state.selectedSource === src.name ? 'default' : 'secondary'}
+            className="cursor-pointer"
             onClick={() => state.selectSource(src.name)}
           >
             {src.name}
             <span className="ml-1 text-gray-400">{src.row_count}</span>
-          </button>
+          </Badge>
         ))}
         {state.durationMs != null && (
           <span className="ml-auto shrink-0 text-xs text-gray-400">{state.durationMs}ms</span>

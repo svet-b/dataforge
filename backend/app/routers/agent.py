@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 from anthropic.types import MessageParam
@@ -62,7 +63,7 @@ async def _create_agent_context(
     sources: list[dict[str, Any]],
     parameters: dict[str, Any],
     current_query: str | None,
-) -> tuple[AgentContext, list[dict[str, object]]]:
+) -> tuple[AgentContext, list[dict[str, object]], list[Path]]:
     """Create a DuckDB session with sources loaded for the agent.
 
     Returns (context, table_schemas) where table_schemas is ready for the system prompt.
@@ -75,10 +76,16 @@ async def _create_agent_context(
 
     # Load all sources
     executor = WorkflowExecutor(settings)
+    temp_files: list[Path] = []
     table_names: list[str] = []
-    for source in sources:
-        await executor._load_source(session, source, parameters)
-        table_names.append(source["table_name"])
+    try:
+        for source in sources:
+            await executor.load_source(session, source, parameters, temp_files)
+            table_names.append(source["table_name"])
+    except Exception:
+        session.close()
+        executor._cleanup_temp_files(temp_files)
+        raise
 
     # Compute schemas once — embedded in system prompt, no tool call needed
     table_schemas: list[dict[str, object]] = []
@@ -92,12 +99,13 @@ async def _create_agent_context(
         table_names=table_names,
         current_query=current_query,
     )
-    return ctx, table_schemas
+    return ctx, table_schemas, temp_files
 
 
 async def _event_stream(
     agent_events: AsyncIterator[AgentEvent],
     duckdb_session: DuckDBSession,
+    temp_files: list[Path],
     workflow_id: str,
 ) -> AsyncIterator[dict[str, str]]:
     """Wrap agent events as SSE dicts, persist the assistant message, and ensure cleanup."""
@@ -137,6 +145,7 @@ async def _event_stream(
             }
     finally:
         duckdb_session.close()
+        WorkflowExecutor._cleanup_temp_files(temp_files)
 
         if assistant_content:
             save_db = SessionLocal()
@@ -231,12 +240,15 @@ async def agent_chat(
     )
     initial_messages = _chat_history_to_messages(list(reversed(recent_history)))
 
-    ctx, table_schemas = await _create_agent_context(sources, parameters, current_query)
+    ctx, table_schemas, temp_files = await _create_agent_context(
+        sources,
+        parameters,
+        current_query,
+    )
 
-    param_info: list[dict[str, object]] = []
-    for p in workflow.parameters:
-        assert isinstance(p, dict)
-        param_info.append(p)
+    param_info: list[dict[str, object]] = [
+        p for p in workflow.parameters if isinstance(p, dict)
+    ]
 
     system_prompt = build_agent_system_prompt(
         tables=table_schemas,
@@ -254,6 +266,6 @@ async def agent_chat(
     )
 
     return EventSourceResponse(
-        _event_stream(agent_events, ctx.session, workflow_id),
+        _event_stream(agent_events, ctx.session, temp_files, workflow_id),
         media_type="text/event-stream",
     )

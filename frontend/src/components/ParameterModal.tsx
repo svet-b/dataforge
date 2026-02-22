@@ -3,6 +3,7 @@ import type { WorkflowParameter } from '@/types';
 import { useWorkflowStore } from '@/stores/workflow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -93,15 +94,19 @@ export default function ParameterModal({ workflowId, parameters, open, onClose }
                   onChange={(e) => updateRow(i, 'name', e.target.value)}
                 />
                 <div className="flex gap-1">
-                  <select
-                    className="w-24 rounded border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+                  <Select
                     value={row.type}
-                    onChange={(e) => updateRow(i, 'type', e.target.value)}
+                    onValueChange={(v) => updateRow(i, 'type', v)}
                   >
-                    <option value="string">string</option>
-                    <option value="number">number</option>
-                    <option value="boolean">boolean</option>
-                  </select>
+                    <SelectTrigger className="h-8 w-24 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="string">string</SelectItem>
+                      <SelectItem value="number">number</SelectItem>
+                      <SelectItem value="boolean">boolean</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Input
                     className="flex-1 text-xs"
                     placeholder="Default value"
