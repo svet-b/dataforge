@@ -5,6 +5,8 @@ import { useRunsStore } from '@/stores/runs';
 import { useResultsStore } from '@/stores/results';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -72,22 +74,25 @@ export default function RunDialog({ workflowId, parameters, open, onClose, onRun
           <div className="space-y-3">
             {parameters.map((param) => (
               <div key={param.name}>
-                <label htmlFor={`run-param-${param.name}`} className="mb-1 block text-xs font-medium text-gray-600">
+                <Label htmlFor={`run-param-${param.name}`} className="mb-1 block text-xs text-gray-600">
                   {param.name}
                   {param.description && (
                     <span className="ml-1 font-normal text-gray-400">- {param.description}</span>
                   )}
-                </label>
+                </Label>
                 {param.type === 'boolean' ? (
-                  <select
-                    id={`run-param-${param.name}`}
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                  <Select
                     value={values[param.name]}
-                    onChange={(e) => updateValue(param.name, e.target.value)}
+                    onValueChange={(v) => updateValue(param.name, v)}
                   >
-                    <option value="true">true</option>
-                    <option value="false">false</option>
-                  </select>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">true</SelectItem>
+                      <SelectItem value="false">false</SelectItem>
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <Input
                     id={`run-param-${param.name}`}

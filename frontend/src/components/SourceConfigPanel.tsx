@@ -5,6 +5,7 @@ import { api } from '@/api/client';
 import { debounce } from '@/utils/debounce';
 import { deriveTableName, tableNameFromUrl } from '@/utils/tableName';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import FileSourceConfig from './FileSourceConfig';
 import ApiSourceConfig from './ApiSourceConfig';
 
@@ -159,7 +160,7 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
       <div className="space-y-3 p-3">
         {/* Table name */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Table Name</label>
+          <Label className="mb-1 block text-xs text-gray-600">Table Name</Label>
           <Input
             className="text-sm"
             value={tableName}
@@ -221,7 +222,7 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
         ) : schemaColumns.length > 0 ? (
           <div className="pt-1">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-600">Schema</span>
+              <Label className="text-xs text-gray-600">Schema</Label>
               {schemaRowCount !== null && (
                 <span className="text-xs text-gray-400">{schemaRowCount.toLocaleString()} rows</span>
               )}

@@ -1,8 +1,14 @@
-import { useState } from 'react';
 import type { SourceType } from '@/types';
 import { useWorkflowStore } from '@/stores/workflow';
 import { deriveTableName } from '@/utils/tableName';
-import { FileSpreadsheet, Globe, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
+import { FileSpreadsheet, Globe, Plus, X } from 'lucide-react';
 
 interface SourceListProps {
   workflowId: string;
@@ -16,14 +22,12 @@ export default function SourceList({ workflowId }: SourceListProps) {
   const selectSource = useWorkflowStore((s) => s.selectSource);
 
   const sources = workflow?.sources ?? [];
-  const [showAddMenu, setShowAddMenu] = useState(false);
 
   function handleAdd(type: SourceType) {
     const existingNames = sources.map((s) => s.table_name);
     const prefix = type === 'file' ? 'file' : 'api';
     const tableName = deriveTableName(prefix, existingNames);
     addSource(workflowId, type, tableName);
-    setShowAddMenu(false);
   }
 
   function handleDelete(e: React.MouseEvent, sourceId: string) {
@@ -49,33 +53,24 @@ export default function SourceList({ workflowId }: SourceListProps) {
     <div className="flex flex-col" data-testid="source-list">
       <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Inputs</h3>
-        <div className="relative">
-          <button
-            className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100"
-            onClick={() => setShowAddMenu(!showAddMenu)}
-            data-testid="add-source-btn"
-          >
-            + Add
-          </button>
-          {showAddMenu && (
-            <div className="absolute right-0 z-20 mt-1 w-36 rounded border border-gray-200 bg-white py-1 shadow-lg">
-              <button
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-                onClick={() => handleAdd('file')}
-                data-testid="add-file-source"
-              >
-                <FileSpreadsheet className="h-4 w-4 text-gray-500" /> File Source
-              </button>
-              <button
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-                onClick={() => handleAdd('api')}
-                data-testid="add-api-source"
-              >
-                <Globe className="h-4 w-4 text-gray-500" /> API Source
-              </button>
-            </div>
-          )}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" data-testid="add-source-btn">
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleAdd('file')} data-testid="add-file-source">
+              <FileSpreadsheet className="text-gray-500" />
+              File Source
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAdd('api')} data-testid="add-api-source">
+              <Globe className="text-gray-500" />
+              API Source
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="overflow-y-auto">

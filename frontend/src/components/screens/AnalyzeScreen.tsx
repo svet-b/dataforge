@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useResultsStore } from '@/stores/results';
 import { useCteInspectionStore } from '@/stores/cteInspection';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import LlmChat from '@/components/LlmChat';
 import QueryEditor from '@/components/QueryEditor';
 import ResultsTabContent from '@/components/ResultsTabContent';
@@ -137,34 +138,18 @@ export default function AnalyzeScreen({ workflowId, onRun }: AnalyzeScreenProps)
       {/* Right column: Data tables + Chart */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top-right: Results / CTEs data table */}
-        <div
+        <Tabs
+          value={dataTab}
+          onValueChange={(v) => handleDataTabChange(v as DataTab)}
           className="flex flex-col overflow-hidden bg-white"
           style={{ height: `${vSplitRight}%` }}
         >
-          {/* Tab bar */}
-          <div className="flex shrink-0 items-center border-b border-gray-200 bg-white">
-            <button
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                dataTab === 'results'
-                  ? 'border-b-2 border-blue-500 text-blue-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => handleDataTabChange('results')}
-            >
-              Results
-            </button>
-            <button
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                dataTab === 'ctes'
-                  ? 'border-b-2 border-blue-500 text-blue-700'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => handleDataTabChange('ctes')}
-            >
-              Intermediate CTEs
-            </button>
+          <div className="flex shrink-0 items-center bg-white">
+            <TabsList>
+              <TabsTrigger value="results">Results</TabsTrigger>
+              <TabsTrigger value="ctes">Intermediate CTEs</TabsTrigger>
+            </TabsList>
 
-            {/* Results metadata */}
             {dataTab === 'results' && results.data.length > 0 && (
               <span className="ml-auto pr-3 text-xs text-gray-400">
                 {results.data.length} of {results.rowCount ?? results.data.length} rows
@@ -176,15 +161,13 @@ export default function AnalyzeScreen({ workflowId, onRun }: AnalyzeScreenProps)
             )}
           </div>
 
-          {/* Tab content */}
-          <div className="min-h-0 flex-1 overflow-auto">
-            {dataTab === 'results' ? (
-              <ResultsTabContent />
-            ) : (
-              <CtesTabContent workflowId={workflowId} />
-            )}
-          </div>
-        </div>
+          <TabsContent value="results" className="min-h-0 overflow-auto">
+            <ResultsTabContent />
+          </TabsContent>
+          <TabsContent value="ctes" className="min-h-0 overflow-auto">
+            <CtesTabContent workflowId={workflowId} />
+          </TabsContent>
+        </Tabs>
 
         {/* Right vertical divider */}
         <div

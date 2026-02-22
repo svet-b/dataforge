@@ -3,6 +3,8 @@ import { api } from '@/api/client';
 import { addToast } from '@/stores/toasts';
 import { deriveTableName } from '@/utils/tableName';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface FileSourceConfigProps {
   workflowId: string;
@@ -104,7 +106,7 @@ export default function FileSourceConfig({
       {fileType === 'csv' && (
         <div className="flex gap-3">
           <div className="w-20">
-            <label className="mb-1 block text-xs font-medium text-gray-600">Delimiter</label>
+            <Label className="mb-1 block text-xs text-gray-600">Delimiter</Label>
             <Input
               className="text-sm"
               value={delimiter}
@@ -112,13 +114,12 @@ export default function FileSourceConfig({
             />
           </div>
           <div className="flex items-end gap-1.5 pb-0.5">
-            <input
-              type="checkbox"
+            <Checkbox
               id={`header-${sourceId}`}
               checked={hasHeader}
-              onChange={(e) => { onHasHeaderChange(e.target.checked); onFieldChange(); }}
+              onCheckedChange={(checked) => { onHasHeaderChange(checked === true); onFieldChange(); }}
             />
-            <label htmlFor={`header-${sourceId}`} className="text-xs text-gray-600">Header row</label>
+            <Label htmlFor={`header-${sourceId}`} className="text-xs text-gray-600">Header row</Label>
           </div>
         </div>
       )}

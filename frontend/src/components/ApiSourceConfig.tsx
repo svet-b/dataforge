@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import type { SourceRawResponse } from '@/types';
 import { api } from '@/api/client';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { ChevronDown, ChevronRight, Loader2, Play } from 'lucide-react';
 import KeyValueEditor from './KeyValueEditor';
 import JsonTree from './JsonTree';
@@ -81,7 +83,7 @@ export default function ApiSourceConfig({
       {/* URL */}
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <label className="block text-xs font-medium text-gray-600">URL</label>
+          <Label className="text-xs text-gray-600">URL</Label>
           {url && (
             <button
               className="flex items-center gap-1 text-xs text-blue-600 underline hover:text-blue-800 disabled:opacity-50"
@@ -111,19 +113,23 @@ export default function ApiSourceConfig({
       </div>
 
       <div className="w-28">
-        <label className="mb-1 block text-xs font-medium text-gray-600">Method</label>
-        <select
-          className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+        <Label className="mb-1 block text-xs text-gray-600">Method</Label>
+        <Select
           value={method}
-          onChange={(e) => { onMethodChange(e.target.value); onFieldChange(); }}
+          onValueChange={(v) => { onMethodChange(v); onFieldChange(); }}
         >
-          <option value="GET">GET</option>
-          <option value="POST">POST</option>
-        </select>
+          <SelectTrigger className="h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="GET">GET</SelectItem>
+            <SelectItem value="POST">POST</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-600">Headers</label>
+        <Label className="mb-1 block text-xs text-gray-600">Headers</Label>
         <KeyValueEditor
           entries={headers}
           onChange={(newHeaders) => { onHeadersChange(newHeaders); onFieldChange(); }}
@@ -134,7 +140,7 @@ export default function ApiSourceConfig({
 
       {method === 'POST' && (
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Body</label>
+          <Label className="mb-1 block text-xs text-gray-600">Body</Label>
           <Textarea
             className="font-mono text-sm"
             rows={3}
@@ -146,7 +152,7 @@ export default function ApiSourceConfig({
       )}
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-600">Response Path</label>
+        <Label className="mb-1 block text-xs text-gray-600">Response Path</Label>
         <Input
           className="text-sm"
           value={responsePath}

@@ -14,6 +14,8 @@ import {
 } from 'chart.js';
 import type { SchemaColumn } from '@/types';
 import { NUMERIC_TYPE_RE } from '@/utils/columnTypes';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 Chart.register(
   BarController,
@@ -177,33 +179,35 @@ export default function ResultsChart({ data, schema }: ResultsChartProps) {
       {/* Chart controls */}
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-3 py-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">Type:</span>
-          <select
-            className="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-500 focus:outline-none"
-            value={chartType}
-            onChange={(e) => setChartType(e.target.value as ChartType)}
-          >
-            <option value="bar">Bar</option>
-            <option value="line">Line</option>
-          </select>
+          <Label className="text-xs text-gray-500">Type</Label>
+          <Select value={chartType} onValueChange={(v) => setChartType(v as ChartType)}>
+            <SelectTrigger className="h-7 w-20 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bar">Bar</SelectItem>
+              <SelectItem value="line">Line</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">X-axis:</span>
-          <select
-            className="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-blue-500 focus:outline-none"
-            value={xAxis ?? ''}
-            onChange={(e) => setSelectedXAxis(e.target.value || null)}
-          >
-            <option value="">(row index)</option>
-            {schema.map((col) => (
-              <option key={col.name} value={col.name}>{col.name}</option>
-            ))}
-          </select>
+          <Label className="text-xs text-gray-500">X-axis</Label>
+          <Select value={xAxis ?? '__index__'} onValueChange={(v) => setSelectedXAxis(v === '__index__' ? null : v)}>
+            <SelectTrigger className="h-7 w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__index__">(row index)</SelectItem>
+              {schema.map((col) => (
+                <SelectItem key={col.name} value={col.name}>{col.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-500">Series:</span>
+          <Label className="text-xs text-gray-500">Series</Label>
           {numericColumns.map((col, idx) => (
             <button
               key={col.name}

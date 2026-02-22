@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useCteInspectionStore } from '@/stores/cteInspection';
+import { Badge } from '@/components/ui/badge';
 import DataTable from '@/components/DataTable';
 import { Loader2 } from 'lucide-react';
 
@@ -37,18 +38,15 @@ export default function CtesTabContent({ workflowId: _workflowId }: { workflowId
       {/* CTE pills */}
       <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-gray-200 bg-white px-3 py-1.5">
         {cteState.ctes.map((cte) => (
-          <button
+          <Badge
             key={cte.name}
-            className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-              cteState.selectedCte === cte.name
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            variant={cteState.selectedCte === cte.name ? 'default' : 'secondary'}
+            className="cursor-pointer"
             onClick={() => cteState.selectCte(cte.name)}
           >
             {cte.name}
             <span className="ml-1 text-gray-400">{cte.row_count}</span>
-          </button>
+          </Badge>
         ))}
       </div>
       {selectedCteData && (
