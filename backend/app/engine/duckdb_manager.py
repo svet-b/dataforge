@@ -24,19 +24,6 @@ class DuckDBSession:
         self.conn = duckdb.connect(":memory:")
         self.conn.execute(f"SET memory_limit = '{memory_limit_mb}MB'")
 
-    def _list_tables(self) -> list[str]:
-        """Return names of all user-created tables in the session."""
-        result = self.conn.execute(
-            "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = 'main'"
-        )
-        return [row[0] for row in result.fetchall()]
-
-    def _list_variables(self) -> list[tuple[str, str]]:
-        """Return all session variables as (name, value) pairs."""
-        result = self.conn.execute("SELECT name, value FROM duckdb_variables()")
-        return [(row[0], str(row[1])) for row in result.fetchall()]
-
     def set_variable(self, name: str, value: str) -> None:
         """Set a DuckDB session variable for workflow parameter injection."""
         _validate_table_name(name)  # variable names follow same rules
@@ -68,54 +55,10 @@ class DuckDBSession:
         safe_name = _validate_table_name(table_name)
         self.conn.execute(f"CREATE TABLE {safe_name} AS SELECT * FROM read_parquet('{file_path}')")
 
-    def _copy_table_to(self, target: duckdb.DuckDBPyConnection, table_name: str) -> None:
-        """Copy a table from this session's connection into *target*."""
-        schema = self.conn.execute(f"DESCRIBE {table_name}").fetchall()
-        cols = ", ".join(f'"{row[0]}" {row[1]}' for row in schema)
-        target.execute(f"CREATE TABLE {table_name} ({cols})")
-        rows = self.conn.execute(f"SELECT * FROM {table_name}").fetchall()
-        if rows:
-            placeholders = ", ".join(["?"] * len(schema))
-            target.executemany(f"INSERT INTO {table_name} VALUES ({placeholders})", rows)
-
     def execute_transform(self, table_name: str, sql: str) -> None:
-        """Execute a transform SQL and store result as a named table.
-
-        User SQL is executed in a sandboxed DuckDB connection that has
-        ``enable_external_access`` disabled at creation time.  This prevents
-        functions like ``read_csv()`` or ``read_parquet()`` from reaching the
-        filesystem.  Source tables and variables are copied into the sandbox
-        so the user query can reference them normally.
-        """
+        """Execute a transform SQL and store result as a named table."""
         safe_name = _validate_table_name(table_name)
-
-        # Build a sandboxed connection with external access disabled.
-        sandbox = duckdb.connect(":memory:", config={"enable_external_access": "false"})
-        try:
-            # Copy all existing tables into the sandbox.
-            for src_name in self._list_tables():
-                self._copy_table_to(sandbox, src_name)
-
-            # Copy session variables.
-            for var_name, var_value in self._list_variables():
-                escaped = var_value.replace("'", "''")
-                sandbox.execute(f"SET VARIABLE {var_name} = '{escaped}'")
-
-            # Execute user SQL inside the sandbox.
-            sandbox.execute(f"CREATE TABLE {safe_name} AS ({sql})")
-
-            # Copy the result back into the main connection.
-            result_schema = sandbox.execute(f"DESCRIBE {safe_name}").fetchall()
-            result_cols = ", ".join(f'"{r[0]}" {r[1]}' for r in result_schema)
-            self.conn.execute(f"CREATE TABLE {safe_name} ({result_cols})")
-            result_rows = sandbox.execute(f"SELECT * FROM {safe_name}").fetchall()
-            if result_rows:
-                ph = ", ".join(["?"] * len(result_schema))
-                self.conn.executemany(
-                    f"INSERT INTO {safe_name} VALUES ({ph})", result_rows
-                )
-        finally:
-            sandbox.close()
+        self.conn.execute(f"CREATE TABLE {safe_name} AS ({sql})")
 
     def get_table_data(self, table_name: str, limit: int | None = None) -> list[dict[str, Any]]:
         """Fetch table contents as a list of dicts."""
