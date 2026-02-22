@@ -48,7 +48,10 @@ async def test_simple_workflow_execution(executor: WorkflowExecutor) -> None:
     assert len(result.source_file_hashes["raw_data"]) == 64  # SHA-256 hex
     assert "raw_data" in result.source_file_paths
     assert result.source_file_paths["raw_data"].exists()
-    assert len(result.ndjson_result) > 0
+    assert result.ndjson_result_path is not None
+    assert result.ndjson_result_path.exists()
+    assert result.ndjson_result_path.stat().st_size > 0
+    result.ndjson_result_path.unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio

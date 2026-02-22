@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -86,17 +87,32 @@ class DuckDBSession:
 
     def export_ndjson_sorted(self, table_name: str) -> bytes:
         """Export table as deterministically sorted NDJSON (ORDER BY all columns)."""
+        with tempfile.NamedTemporaryFile(mode="w+b", suffix=".ndjson", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        self.export_ndjson_sorted_to_file(table_name, tmp_path)
+        try:
+            return tmp_path.read_bytes()
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+    def export_ndjson_sorted_to_file(self, table_name: str, output_path: Path) -> None:
+        """Export table as deterministically sorted NDJSON directly to disk."""
         safe_name = _validate_table_name(table_name)
         # Get column names for ORDER BY
         schema = self.get_table_schema(safe_name)
         order_cols = ", ".join(f'"{col["name"]}"' for col in schema)
         result = self.conn.execute(f"SELECT * FROM {safe_name} ORDER BY {order_cols}")
         columns = [desc[0] for desc in result.description]
-        lines: list[str] = []
-        for row in result.fetchall():
-            record = dict(zip(columns, row))
-            lines.append(json.dumps(record, sort_keys=True, separators=(",", ":"), default=str))
-        return "\n".join(lines).encode("utf-8")
+        with output_path.open("w", encoding="utf-8") as f:
+            while True:
+                batch = result.fetchmany(10_000)
+                if not batch:
+                    break
+                for row in batch:
+                    record = dict(zip(columns, row))
+                    line = json.dumps(record, sort_keys=True, separators=(",", ":"), default=str)
+                    f.write(line)
+                    f.write("\n")
 
     def validate_query(self, sql: str) -> str | None:
         """Validate a SQL query using EXPLAIN without executing it.

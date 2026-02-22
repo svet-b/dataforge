@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,7 +35,7 @@ class ExecutionResult:
     schema_info: list[dict[str, str]] = field(default_factory=list)
     source_file_hashes: dict[str, str] = field(default_factory=dict)
     source_file_paths: dict[str, Path] = field(default_factory=dict)
-    ndjson_result: bytes = field(default=b"")
+    ndjson_result_path: Path | None = field(default=None)
 
 
 @dataclass
@@ -108,8 +109,10 @@ class WorkflowExecutor:
             row_count = session.get_row_count("_result")
             data = session.get_table_data("_result", limit=preview_limit)
 
-            # 6. Export deterministic NDJSON of full result
-            ndjson_result = session.export_ndjson_sorted("_result")
+            # 6. Export deterministic NDJSON of full result to temp file
+            with tempfile.NamedTemporaryFile(mode="w+b", suffix=".ndjson", delete=False) as tmp:
+                ndjson_path = Path(tmp.name)
+            session.export_ndjson_sorted_to_file("_result", ndjson_path)
 
             return ExecutionResult(
                 status="success",
@@ -120,7 +123,7 @@ class WorkflowExecutor:
                 schema_info=schema_info,
                 source_file_hashes=source_file_hashes,
                 source_file_paths=source_file_paths,
-                ndjson_result=ndjson_result,
+                ndjson_result_path=ndjson_path,
             )
 
         except WorkflowExecutionError as e:
@@ -149,7 +152,7 @@ class WorkflowExecutor:
         session: DuckDBSession,
         source: dict[str, Any],
         parameters: dict[str, Any],
-        temp_files: list[Path] | None = None,
+        temp_files: list[Path],
     ) -> tuple[str, Path]:
         """Load a source into DuckDB and return (SHA-256 of file, file path).
 
@@ -173,8 +176,7 @@ class WorkflowExecutor:
         elif source["type"] == "api":
             file_path = await self.api_connector.fetch(config, parameters, env)
             session.load_json(table_name, file_path)
-            if temp_files is not None:
-                temp_files.append(file_path)
+            temp_files.append(file_path)
         else:
             msg = f"Unknown source type: {source['type']}"
             raise WorkflowExecutionError(msg)
