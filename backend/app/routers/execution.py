@@ -194,6 +194,7 @@ async def run_workflow(
                 os.unlink(exec_result.ndjson_result_path)
             except OSError:
                 pass
+        WorkflowExecutor._cleanup_temp_files(exec_result.temp_files)
 
 
 @router.post("/{workflow_id}/inspect-ctes")

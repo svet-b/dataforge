@@ -37,6 +37,7 @@ class ExecutionResult:
     source_file_hashes: dict[str, str] = field(default_factory=dict)
     source_file_paths: dict[str, Path] = field(default_factory=dict)
     ndjson_result_path: Path | None = field(default=None)
+    temp_files: list[Path] = field(default_factory=list)
 
 
 @dataclass
@@ -126,9 +127,11 @@ class WorkflowExecutor:
                 source_file_hashes=source_file_hashes,
                 source_file_paths=source_file_paths,
                 ndjson_result_path=ndjson_path,
+                temp_files=temp_files,
             )
 
         except WorkflowExecutionError as e:
+            self._cleanup_temp_files(temp_files)
             return ExecutionResult(
                 status="failed",
                 duration_ms=int((time.monotonic() - start_time) * 1000),
@@ -137,6 +140,7 @@ class WorkflowExecutor:
                 error={"message": e.message, "sql": e.sql},
             )
         except Exception as e:
+            self._cleanup_temp_files(temp_files)
             return ExecutionResult(
                 status="failed",
                 duration_ms=int((time.monotonic() - start_time) * 1000),
@@ -147,7 +151,6 @@ class WorkflowExecutor:
         finally:
             if session:
                 session.close()
-            self._cleanup_temp_files(temp_files)
 
     async def load_source(
         self,
@@ -184,6 +187,11 @@ class WorkflowExecutor:
         elif source["type"] == "ammp":
             file_path = await self.ammp_connector.fetch(config, parameters, env)
             session.load_json(table_name, file_path)
+            # Sub-daily intervals return ISO timestamps with timezone offsets
+            # that DuckDB auto-detects as VARCHAR; cast to TIMESTAMPTZ.
+            interval = self.ammp_connector._resolve(config, parameters, "interval", "1h")
+            if interval in ("15min", "1h"):
+                session.cast_column(table_name, "date", "TIMESTAMPTZ")
             temp_files.append(file_path)
         else:
             msg = f"Unknown source type: {source['type']}"
