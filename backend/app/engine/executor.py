@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import Settings
+from app.connectors.ammp_connector import AMMPConnector
 from app.connectors.api_connector import APIConnector
 from app.connectors.file_connector import FileConnector
 from app.engine.cte_parser import extract_ctes
@@ -60,6 +61,7 @@ class WorkflowExecutor:
         self.settings = settings
         self.file_connector = FileConnector()
         self.api_connector = APIConnector()
+        self.ammp_connector = AMMPConnector()
 
     @staticmethod
     def _cleanup_temp_files(temp_files: list[Path]) -> None:
@@ -161,7 +163,9 @@ class WorkflowExecutor:
         """
         config = source["config"]
         table_name = source["table_name"]
-        env: dict[str, str] = {}  # populated from settings/environment in later stages
+        env: dict[str, str] = {}
+        if self.settings.ammp_data_api_key:
+            env["AMMP_DATA_API_KEY"] = self.settings.ammp_data_api_key
 
         if source["type"] == "file":
             file_path = await self.file_connector.fetch(config, parameters, env)
@@ -175,6 +179,10 @@ class WorkflowExecutor:
                 session.load_csv(table_name, file_path, **options)
         elif source["type"] == "api":
             file_path = await self.api_connector.fetch(config, parameters, env)
+            session.load_json(table_name, file_path)
+            temp_files.append(file_path)
+        elif source["type"] == "ammp":
+            file_path = await self.ammp_connector.fetch(config, parameters, env)
             session.load_json(table_name, file_path)
             temp_files.append(file_path)
         else:

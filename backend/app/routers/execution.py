@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.connectors.ammp_connector import AMMPConnector
 from app.connectors.api_connector import APIConnector
 from app.database import get_db
 from app.engine.duckdb_manager import DuckDBSession
@@ -356,13 +357,20 @@ async def source_raw_response(
     if source_dict is None:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    if source_dict["type"] != "api":
-        raise HTTPException(status_code=400, detail="Source is not an API source")
+    if source_dict["type"] not in ("api", "ammp"):
+        raise HTTPException(status_code=400, detail="Source is not an API or AMMP source")
 
     config = source_dict["config"]
-    connector = APIConnector()
     try:
-        raw_data, extracted = await connector.fetch_raw(config, {}, {})
+        if source_dict["type"] == "ammp":
+            env: dict[str, str] = {}
+            if settings.ammp_data_api_key:
+                env["AMMP_DATA_API_KEY"] = settings.ammp_data_api_key
+            connector_ammp = AMMPConnector()
+            raw_data, extracted = await connector_ammp.fetch_raw(config, {}, env)
+        else:
+            connector_api = APIConnector()
+            raw_data, extracted = await connector_api.fetch_raw(config, {}, {})
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 

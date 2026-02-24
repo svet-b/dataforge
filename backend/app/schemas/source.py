@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class SourceCreate(BaseModel):
     table_name: str
-    type: Literal["file", "api"]
+    type: Literal["file", "api", "ammp"]
     config: dict[str, Any] = {}
 
 

@@ -28,7 +28,7 @@ export interface SourceResponse {
   id: string;
   workflow_id: string;
   table_name: string;
-  type: 'file' | 'api';
+  type: 'file' | 'api' | 'ammp';
   config: Record<string, unknown>;
 }
 
@@ -49,7 +49,7 @@ export interface WorkflowUpdate {
   parameters?: WorkflowParameter[] | null;
 }
 
-export type SourceType = 'file' | 'api';
+export type SourceType = 'file' | 'api' | 'ammp';
 
 export interface SourceCreate {
   table_name: string;

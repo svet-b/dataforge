@@ -8,7 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
-import { FileSpreadsheet, Globe, Plus, X } from 'lucide-react';
+import { FileSpreadsheet, Globe, Plus, Sun, X } from 'lucide-react';
 
 interface SourceListProps {
   workflowId: string;
@@ -25,7 +25,7 @@ export default function SourceList({ workflowId }: SourceListProps) {
 
   function handleAdd(type: SourceType) {
     const existingNames = sources.map((s) => s.table_name);
-    const prefix = type === 'file' ? 'file' : 'api';
+    const prefix = type === 'file' ? 'file' : type === 'ammp' ? 'ammp' : 'api';
     const tableName = deriveTableName(prefix, existingNames);
     addSource(workflowId, type, tableName);
   }
@@ -40,12 +40,13 @@ export default function SourceList({ workflowId }: SourceListProps) {
   }
 
   function TypeIcon({ type }: { type: string }) {
-    return type === 'api'
-      ? <Globe className="h-4 w-4 text-gray-500" />
-      : <FileSpreadsheet className="h-4 w-4 text-gray-500" />;
+    if (type === 'ammp') return <Sun className="h-4 w-4 text-gray-500" />;
+    if (type === 'api') return <Globe className="h-4 w-4 text-gray-500" />;
+    return <FileSpreadsheet className="h-4 w-4 text-gray-500" />;
   }
 
   function typeLabel(type: string): string {
+    if (type === 'ammp') return 'AMMP';
     return type === 'api' ? 'API' : 'File';
   }
 
@@ -68,6 +69,10 @@ export default function SourceList({ workflowId }: SourceListProps) {
             <DropdownMenuItem onClick={() => handleAdd('api')} data-testid="add-api-source">
               <Globe className="text-gray-500" />
               API Source
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAdd('ammp')} data-testid="add-ammp-source">
+              <Sun className="text-gray-500" />
+              AMMP Data API
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

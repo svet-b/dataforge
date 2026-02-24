@@ -8,6 +8,8 @@ services:
     environment:
       DATABASE_URL: "sqlite:////data/dataforge.db"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      AMMP_DATA_API_KEY: "${AMMP_DATA_API_KEY}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     volumes:
       - ./backend:/app/backend
       - ./.data:/data

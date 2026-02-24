@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     data_dir: str = "/data"
     max_run_history: int = 20
 
+    # AMMP Data API
+    ammp_data_api_key: str = ""
+
     # LLM (used in later stages)
     llm_model: str = "claude-sonnet-4-6"
     anthropic_api_key: str = ""

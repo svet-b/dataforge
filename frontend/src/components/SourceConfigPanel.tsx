@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import FileSourceConfig from './FileSourceConfig';
 import ApiSourceConfig from './ApiSourceConfig';
+import AmmpSourceConfig from './AmmpSourceConfig';
 
 
 
@@ -37,6 +38,13 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
   const [body, setBody] = useState((source.config.body as string) ?? '');
   const [responsePath, setResponsePath] = useState((source.config.response_path as string) ?? '');
 
+  // ── AMMP source state ──
+  const [ammpEndpoint, setAmmpEndpoint] = useState((source.config.endpoint as string) ?? 'historic-energy');
+  const [ammpAssetId, setAmmpAssetId] = useState((source.config.asset_id as string) ?? '');
+  const [ammpDateFrom, setAmmpDateFrom] = useState((source.config.date_from as string) ?? '');
+  const [ammpDateTo, setAmmpDateTo] = useState((source.config.date_to as string) ?? '');
+  const [ammpInterval, setAmmpInterval] = useState((source.config.interval as string) ?? '1h');
+
   // ── Common ──
   const [tableName, setTableName] = useState(source.table_name);
   const [tableNameManuallyEdited, setTableNameManuallyEdited] = useState(false);
@@ -54,7 +62,9 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
 
   const sourceConfigured = source.type === 'file'
     ? !!(source.config.filename as string)
-    : !!(source.config.url as string);
+    : source.type === 'ammp'
+      ? !!(source.config.asset_id as string)
+      : !!(source.config.url as string);
 
   // Reset state when source changes
   useEffect(() => {
@@ -72,6 +82,11 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
     );
     setBody((source.config.body as string) ?? '');
     setResponsePath((source.config.response_path as string) ?? '');
+    setAmmpEndpoint((source.config.endpoint as string) ?? 'historic-energy');
+    setAmmpAssetId((source.config.asset_id as string) ?? '');
+    setAmmpDateFrom((source.config.date_from as string) ?? '');
+    setAmmpDateTo((source.config.date_to as string) ?? '');
+    setAmmpInterval((source.config.interval as string) ?? '1h');
     setTableNameManuallyEdited(false);
   }, [source]);
 
@@ -103,29 +118,37 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
   }, [source.id, sourceConfigured, source.config.response_path, fetchSchema]);
 
   // Use a ref to hold the latest local state for the debounced save
-  const stateRef = useRef({ tableName, filename, fileType, delimiter, hasHeader, url, method, headers, body, responsePath });
-  stateRef.current = { tableName, filename, fileType, delimiter, hasHeader, url, method, headers, body, responsePath };
+  const stateRef = useRef({ tableName, filename, fileType, delimiter, hasHeader, url, method, headers, body, responsePath, ammpEndpoint, ammpAssetId, ammpDateFrom, ammpDateTo, ammpInterval });
+  stateRef.current = { tableName, filename, fileType, delimiter, hasHeader, url, method, headers, body, responsePath, ammpEndpoint, ammpAssetId, ammpDateFrom, ammpDateTo, ammpInterval };
 
   const saveConfig = useMemo(
     () =>
       debounce(() => {
         const s = stateRef.current;
-        const config = source.type === 'file'
-          ? (() => {
-              const cfg: Record<string, unknown> = { filename: s.filename, file_type: s.fileType };
-              if (s.fileType === 'csv') {
-                cfg.delimiter = s.delimiter;
-                cfg.has_header = s.hasHeader;
-              }
-              return cfg;
-            })()
-          : {
-              url: s.url,
-              method: s.method,
-              headers: s.headers.filter((h) => h.key),
-              body: s.method === 'POST' ? s.body : undefined,
-              response_path: s.responsePath || undefined,
-            };
+        let config: Record<string, unknown>;
+        if (source.type === 'file') {
+          config = { filename: s.filename, file_type: s.fileType };
+          if (s.fileType === 'csv') {
+            config.delimiter = s.delimiter;
+            config.has_header = s.hasHeader;
+          }
+        } else if (source.type === 'ammp') {
+          config = {
+            endpoint: s.ammpEndpoint,
+            asset_id: s.ammpAssetId || undefined,
+            date_from: s.ammpDateFrom || undefined,
+            date_to: s.ammpDateTo || undefined,
+            interval: s.ammpInterval || undefined,
+          };
+        } else {
+          config = {
+            url: s.url,
+            method: s.method,
+            headers: s.headers.filter((h) => h.key),
+            body: s.method === 'POST' ? s.body : undefined,
+            response_path: s.responsePath || undefined,
+          };
+        }
         updateSource(workflowId, source.id, {
           table_name: s.tableName || undefined,
           config,
@@ -190,6 +213,22 @@ export default function SourceConfigPanel({ workflowId, source }: SourceConfigPa
               saveConfig();
               setTimeout(() => fetchSchema(), 600);
             }}
+          />
+        ) : source.type === 'ammp' ? (
+          <AmmpSourceConfig
+            workflowId={workflowId}
+            sourceId={source.id}
+            endpoint={ammpEndpoint}
+            assetId={ammpAssetId}
+            dateFrom={ammpDateFrom}
+            dateTo={ammpDateTo}
+            interval={ammpInterval}
+            onEndpointChange={setAmmpEndpoint}
+            onAssetIdChange={setAmmpAssetId}
+            onDateFromChange={setAmmpDateFrom}
+            onDateToChange={setAmmpDateTo}
+            onIntervalChange={setAmmpInterval}
+            onFieldChange={onFieldChange}
           />
         ) : (
           <ApiSourceConfig
