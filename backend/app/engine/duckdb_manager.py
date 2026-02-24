@@ -38,6 +38,12 @@ class DuckDBSession:
             f"CREATE TABLE {safe_name} AS SELECT * FROM read_json_auto('{file_path}')"
         )
 
+    def cast_column(self, table_name: str, column_name: str, target_type: str) -> None:
+        """ALTER a column's type in-place (e.g. VARCHAR → TIMESTAMPTZ)."""
+        safe_table = _validate_table_name(table_name)
+        safe_col = _validate_table_name(column_name)
+        self.conn.execute(f"ALTER TABLE {safe_table} ALTER COLUMN {safe_col} TYPE {target_type}")
+
     def load_csv(self, table_name: str, file_path: Path, **options: Any) -> None:
         """Load a CSV file into a named table."""
         safe_name = _validate_table_name(table_name)

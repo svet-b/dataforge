@@ -16,6 +16,7 @@ dependencies = [
     "sqlglot>=28.10.1",
     "sse-starlette>=2.0",
     "cuid2>=2.0",
+    "pytz>=2025.2",
 ]
 
 [dependency-groups]

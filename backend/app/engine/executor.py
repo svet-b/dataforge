@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import tempfile
@@ -72,6 +73,22 @@ class WorkflowExecutor:
                 os.unlink(path)
             except OSError:
                 logger.debug("Failed to remove temp file: %s", path)
+
+    @staticmethod
+    def _peek_first_date(file_path: Path) -> str | None:
+        """Read the 'date' field from the first line of an NDJSON file."""
+        try:
+            with file_path.open() as f:
+                line = f.readline().strip()
+                if line:
+                    parsed = json.loads(line)
+                    if isinstance(parsed, dict):
+                        date_value = parsed.get("date")
+                        if isinstance(date_value, str):
+                            return date_value
+        except Exception:
+            pass
+        return None
 
     async def execute(
         self,
@@ -187,10 +204,10 @@ class WorkflowExecutor:
         elif source["type"] == "ammp":
             file_path = await self.ammp_connector.fetch(config, parameters, env)
             session.load_json(table_name, file_path)
-            # Sub-daily intervals return ISO timestamps with timezone offsets
-            # that DuckDB auto-detects as VARCHAR; cast to TIMESTAMPTZ.
-            interval = self.ammp_connector._resolve(config, parameters, "interval", "1h")
-            if interval in ("15min", "1h"):
+            # Detect date format from the first record: if it contains "T",
+            # it's an ISO timestamp with timezone that DuckDB leaves as VARCHAR.
+            first_date = self._peek_first_date(file_path)
+            if first_date and "T" in first_date:
                 session.cast_column(table_name, "date", "TIMESTAMPTZ")
             temp_files.append(file_path)
         else:
