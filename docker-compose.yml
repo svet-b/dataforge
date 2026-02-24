@@ -1,7 +1,7 @@
 services:
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
@@ -11,7 +11,10 @@ services:
       AMMP_DATA_API_KEY: "${AMMP_DATA_API_KEY}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     volumes:
-      - ./backend:/app/backend
+      - ./backend/app:/app/backend/app
+      - ./backend/alembic:/app/backend/alembic
+      - ./backend/alembic.ini:/app/backend/alembic.ini
+      - backend_venv:/app/backend/.venv
       - ./.data:/data
     command: sh -c "uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
@@ -29,3 +32,6 @@ services:
     depends_on:
       - backend
     command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  backend_venv:
