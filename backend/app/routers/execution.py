@@ -20,7 +20,7 @@ from app.connectors.api_connector import APIConnector
 from app.database import get_db
 from app.engine.duckdb_manager import DuckDBSession
 from app.engine.executor import WorkflowExecutor
-from app.ids import generate_cuid
+from app.ids import generate_id
 from app.models.run import RunHistory
 from app.models.uploaded_file import UploadedFile
 from app.models.workflow import Workflow
@@ -136,7 +136,7 @@ async def run_workflow(
             result_hash = cas.store_file(settings.data_dir, exec_result.ndjson_result_path)
 
     # Store run in run_history (keep up to 10k rows for downloads)
-    run_id = generate_cuid()
+    run_id = generate_id()
     completed_at = datetime.now(UTC).isoformat()
     run = RunHistory(
         id=run_id,

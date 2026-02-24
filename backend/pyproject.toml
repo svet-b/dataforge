@@ -15,8 +15,8 @@ dependencies = [
     "anthropic>=0.40",
     "sqlglot>=28.10.1",
     "sse-starlette>=2.0",
-    "cuid2>=2.0",
     "pytz>=2025.2",
+    "nanoid>=2.0.0",
 ]
 
 [dependency-groups]
@@ -26,6 +26,7 @@ dev = [
     "httpx",
     "ruff>=0.11",
     "mypy>=1.13",
+    "types-nanoid>=2.0.0.20240601",
 ]
 
 [tool.mypy]

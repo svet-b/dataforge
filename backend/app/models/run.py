@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import JSON, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.ids import generate_cuid
+from app.ids import generate_id
 from app.models.base import Base
 
 if TYPE_CHECKING:
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class RunHistory(Base):
     __tablename__ = "run_history"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_cuid)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_id)
     workflow_id: Mapped[str] = mapped_column(
         String, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
     )

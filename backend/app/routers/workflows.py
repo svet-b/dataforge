@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.ids import generate_cuid
+from app.ids import generate_id
 from app.models.run import RunHistory
 from app.models.source import Source
 from app.models.uploaded_file import UploadedFile
@@ -261,7 +261,7 @@ async def upload_file(
     ext = Path(filename).suffix.lower()
     file_type = FILE_TYPE_MAP.get(ext, "csv")
 
-    file_id = generate_cuid()
+    file_id = generate_id()
     dir_path = Path(settings.data_dir) / "files" / workflow_id
     dir_path.mkdir(parents=True, exist_ok=True)
     storage_path = dir_path / f"{file_id}_{filename}"

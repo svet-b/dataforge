@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from cuid2 import Cuid
+from nanoid import generate
 
-_generate_cuid16 = Cuid(length=16).generate
+ALPHANUMERIC = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+ID_LENGTH = 12
 
 
-def generate_cuid() -> str:
-    return _generate_cuid16()
+def generate_id() -> str:
+    return generate(ALPHANUMERIC, ID_LENGTH)
