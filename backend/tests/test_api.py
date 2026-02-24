@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -18,7 +18,7 @@ def _create_workflow(
         body["parameters"] = parameters
     resp = client.post("/api/workflows", json=body)
     assert resp.status_code == 201
-    return resp.json()
+    return cast(dict[str, Any], resp.json())
 
 
 def _add_source(
@@ -37,7 +37,7 @@ def _add_source(
         },
     )
     assert resp.status_code == 201
-    return resp.json()
+    return cast(dict[str, Any], resp.json())
 
 
 # ── Workflow CRUD ──────────────────────────────────────────────

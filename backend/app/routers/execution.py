@@ -5,9 +5,10 @@ import io
 import json
 import os
 import time
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -385,13 +386,15 @@ async def source_raw_response(
 def _load_preview_data(run: RunHistory) -> list[dict[str, Any]]:
     """Fallback for older runs that only have output_preview."""
     if run.output_preview:
-        return run.output_preview.get("data", [])
+        data = run.output_preview.get("data")
+        if isinstance(data, list):
+            return [row for row in data if isinstance(row, dict)]
     return []
 
 
-def _stream_json_array(cas_file: Path):
+def _stream_json_array(cas_file: Path) -> Iterator[bytes]:
     """Stream NDJSON from CAS as a JSON array without full materialization."""
-    def _iter():
+    def _iter() -> Iterator[bytes]:
         yield b"[\n"
         first = True
         with cas_file.open("r", encoding="utf-8") as f:
@@ -407,17 +410,20 @@ def _stream_json_array(cas_file: Path):
     return _iter()
 
 
-def _stream_csv(cas_file: Path):
+def _stream_csv(cas_file: Path) -> Iterator[bytes]:
     """Stream NDJSON from CAS as CSV without loading all rows."""
-    def _iter():
+    def _iter() -> Iterator[bytes]:
         writer_out = io.StringIO()
-        writer: csv.DictWriter | None = None
+        writer: csv.DictWriter[str] | None = None
         with cas_file.open("r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
-                row = json.loads(line)
+                row_obj = json.loads(line)
+                if not isinstance(row_obj, dict):
+                    continue
+                row = cast(dict[str, Any], row_obj)
                 if writer is None:
                     writer = csv.DictWriter(writer_out, fieldnames=list(row.keys()))
                     writer.writeheader()

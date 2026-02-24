@@ -1,13 +1,25 @@
+from typing import Any, cast
+
 from app.services import cas
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 
-def _create_workflow(client, name="Test Workflow"):
+def _create_workflow(
+    client: TestClient,
+    name: str = "Test Workflow",
+) -> dict[str, Any]:
     resp = client.post("/api/workflows", json={"name": name})
     assert resp.status_code == 201
-    return resp.json()
+    return cast(dict[str, Any], resp.json())
 
 
-def _store_content_and_run(client, db, workflow_id, query_text="SELECT 1"):
+def _store_content_and_run(
+    client: TestClient,
+    db: Session,
+    workflow_id: str,
+    query_text: str = "SELECT 1",
+) -> tuple[Any, str]:
     query_hash = cas.store_content(db, query_text, "query")
     config_hash = cas.store_content(db, '{"sources":[]}', "source_config")
     params_hash = cas.store_content(db, '{"x":1}', "parameters")
@@ -34,7 +46,7 @@ def _store_content_and_run(client, db, workflow_id, query_text="SELECT 1"):
     return run, query_hash
 
 
-def test_get_content_found(client, db):
+def test_get_content_found(client: TestClient, db: Session) -> None:
     wf = _create_workflow(client)
     _run, query_hash = _store_content_and_run(client, db, wf["id"])
 
@@ -47,13 +59,13 @@ def test_get_content_found(client, db):
     assert data["byte_size"] == len(b"SELECT 1")
 
 
-def test_get_content_not_found(client):
+def test_get_content_not_found(client: TestClient) -> None:
     fake_hash = "0" * 64
     resp = client.get(f"/api/content/{fake_hash}")
     assert resp.status_code == 404
 
 
-def test_query_history_basic(client, db):
+def test_query_history_basic(client: TestClient, db: Session) -> None:
     wf = _create_workflow(client)
     _store_content_and_run(client, db, wf["id"], "SELECT 1")
     _store_content_and_run(client, db, wf["id"], "SELECT 1")
@@ -74,14 +86,14 @@ def test_query_history_basic(client, db):
     assert select1["run_count"] == 2
 
 
-def test_query_history_empty(client):
+def test_query_history_empty(client: TestClient) -> None:
     wf = _create_workflow(client)
     resp = client.get(f"/api/workflows/{wf['id']}/query-history")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-def test_query_history_isolates_workflows(client, db):
+def test_query_history_isolates_workflows(client: TestClient, db: Session) -> None:
     wf1 = _create_workflow(client, "WF1")
     wf2 = _create_workflow(client, "WF2")
     _store_content_and_run(client, db, wf1["id"], "SELECT 1")

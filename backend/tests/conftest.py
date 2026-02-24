@@ -1,9 +1,11 @@
 import tempfile
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import StaticPool, create_engine, event
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from app import config
 from app.database import get_db
@@ -18,7 +20,8 @@ engine = create_engine(
 
 
 @event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
+def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
+    _ = connection_record
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
@@ -28,7 +31,7 @@ TestSessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
 @pytest.fixture()
-def db():
+def db() -> Iterator[Session]:
     Base.metadata.create_all(bind=engine)
     session = TestSessionLocal()
     try:
@@ -39,8 +42,8 @@ def db():
 
 
 @pytest.fixture()
-def client(db):
-    def override_get_db():
+def client(db: Session) -> Iterator[TestClient]:
+    def override_get_db() -> Iterator[Session]:
         try:
             yield db
         finally:

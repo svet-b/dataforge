@@ -3,13 +3,13 @@ import tempfile
 from pathlib import Path
 
 from sqlalchemy import StaticPool, create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.models import Base
 from app.services import cas
 
 
-def _make_db():
+def _make_db() -> Session:
     engine = create_engine("sqlite://", poolclass=StaticPool)
     Base.metadata.create_all(bind=engine)
     session = sessionmaker(bind=engine)()

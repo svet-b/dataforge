@@ -49,13 +49,16 @@ def _chat_history_to_messages(history: list[ChatMessage]) -> list[MessageParam]:
     """Convert persisted chat rows to Anthropic message params with size bounds."""
     messages: list[MessageParam] = []
     for item in history:
-        role = "assistant" if item.role == "assistant" else "user"
         content = item.content
         if item.role == "assistant" and item.sql:
             content = f"{content}\n\nSQL:\n```sql\n{item.sql}\n```"
         if item.is_error:
             content = f"[error]\n{content}"
-        messages.append({"role": role, "content": _truncate_text(content)})
+        truncated = _truncate_text(content)
+        if item.role == "assistant":
+            messages.append({"role": "assistant", "content": truncated})
+        else:
+            messages.append({"role": "user", "content": truncated})
     return messages
 
 
