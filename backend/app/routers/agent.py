@@ -6,9 +6,9 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from anthropic.types import MessageParam
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
@@ -45,9 +45,9 @@ def _truncate_text(text: str, max_chars: int = MAX_HISTORY_TEXT_CHARS) -> str:
     return text[: max_chars - 32].rstrip() + "\n\n[... truncated ...]"
 
 
-def _chat_history_to_messages(history: list[ChatMessage]) -> list[MessageParam]:
-    """Convert persisted chat rows to Anthropic message params with size bounds."""
-    messages: list[MessageParam] = []
+def _chat_history_to_messages(history: list[ChatMessage]) -> list[ModelMessage]:
+    """Convert persisted chat rows to Pydantic AI message history with size bounds."""
+    messages: list[ModelMessage] = []
     for item in history:
         content = item.content
         if item.role == "assistant" and item.sql:
@@ -55,10 +55,10 @@ def _chat_history_to_messages(history: list[ChatMessage]) -> list[MessageParam]:
         if item.is_error:
             content = f"[error]\n{content}"
         truncated = _truncate_text(content)
-        if item.role == "assistant":
-            messages.append({"role": "assistant", "content": truncated})
+        if item.role == "user":
+            messages.append(ModelRequest(parts=[UserPromptPart(content=truncated)]))
         else:
-            messages.append({"role": "user", "content": truncated})
+            messages.append(ModelResponse(parts=[TextPart(content=truncated)]))  # type: ignore[call-arg]
     return messages
 
 
